@@ -1,0 +1,23 @@
+# STM32CubeIDE / Eclipse
+.metadata/
+**/Debug/
+**/Release/
+**/.settings/
+*.log
+*.map
+*.elf
+*.hex
+*.bin
+*.d
+*.o
+*.su
+*.crf
+*.htm
+*.dep
+*.lnp
+*.sct
+*.lst
+*.txt
+*.obj
+*.i
+*.axf
