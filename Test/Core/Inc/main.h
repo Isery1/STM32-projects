@@ -69,7 +69,8 @@ void Error_Handler(void);
 #define VCP_RX_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
-
+#define LED_Pin       GPIO_PIN_3
+#define LED_GPIO_Port GPIOB
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
