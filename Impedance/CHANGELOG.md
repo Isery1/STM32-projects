@@ -256,6 +256,15 @@ ECHO < 0x41 'A' >
 | `feat: add hardware self-test mode (LED blink + UART echo)` | Test program for use without AD5940 |
 | `fix: add missing CHIPSEL_594X symbol to .cproject` | Resolved library #error |
 | `fix: add direct UART heartbeat and startup LED pulse` | Debugged silent startup issues |
+| `fix: restore missing startup_stm32f303k8tx.s` | Fixed Reset_Handler linker error |
+
+---
+
+### Fix 6 — Restoring Missing Startup File
+
+**Problem:** The linker reported `warning: cannot find entry symbol Reset_Handler`. This happened because the assembly startup file was deleted during the project cleanup. Without this file, the MCU doesn't know how to boot, resulting in a tiny `text` section (96 bytes) and no code execution.
+
+**Fix:** Restored `startup_stm32f303k8tx.s` from a template and placed it in `Core/Src/`. This file contains the vector table and the `Reset_Handler` which initializes the system and calls `main()`.
 
 ---
 
