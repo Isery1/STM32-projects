@@ -22,19 +22,10 @@ The AD5940 sweeps a configurable frequency range (100 Hz – 100 kHz), measures 
 | SPI1_MISO      | PB4  | AF1 (SPI1)            | Configured in `.ioc`           |
 | SPI1_MOSI      | PB5  | AF1 (SPI1)            | Configured in `.ioc`           |
 | AD5940 CS      | PA8  | GPIO Output (High)    | Configured in `.ioc`           |
-| AD5940 RST     | PA4  | GPIO Output (High)    | Add to `.ioc` — active-low     |
-| AD5940 INT/GP0 | PA0  | GPIO EXTI0, Falling   | Add to `.ioc` — with pull-up, enable EXTI0 in NVIC |
+| AD5940 RST     | PA4  | GPIO Output (High)    | Configured in `.ioc` ✅        |
+| AD5940 INT/GP0 | PA0  | GPIO EXTI0, Falling   | Configured in `.ioc` ✅, EXTI0 NVIC enabled |
 | USART2_TX      | PA2  | AF7 (USART2)          | Nucleo virtual COM port        |
 | USART2_RX      | PA15 | AF7 (USART2)          | Nucleo virtual COM port        |
-
-### `.ioc` Pin Configuration (pending)
-
-| Pin | Label         | Mode            | Pull    | Init Level |
-|---|---|---|---|---|
-| PA4 | `AD5940_RST`  | GPIO_Output     | No pull | **High**   |
-| PA0 | `AD5940_INT`  | GPIO_EXTI0      | Pull-up | —          |
-
-> Also enable **EXTI0** in the NVIC tab after setting PA0.
 
 ---
 
@@ -120,8 +111,8 @@ The AD5940 library is hardware-agnostic. It requires 7 bridge functions to be im
 | `AD5940_RstClr()` / `AD5940_RstSet()` | `HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, ...)` |
 | `AD5940_Delay10us()` | `HAL_Delay()` — rounds 10 µs ticks up to nearest ms |
 | `AD5940_GetMCUIntFlag()` / `AD5940_ClrMCUIntFlag()` | Volatile flag managed by EXTI0 ISR |
-| `AD5940_MCUResourceInit()` | Configures PA4 (RST) and PA0 (INT/EXTI0) at startup |
-| `EXTI0_IRQHandler()` | Sets the interrupt flag, clears EXTI pending bit |
+| `AD5940_MCUResourceInit()` | Deasserts CS and RST at startup — GPIO config now handled by CubeMX |
+| `AD5940_SetMCUIntFlag()` | Sets interrupt flag — called from `EXTI0_IRQHandler` in `stm32f3xx_it.c` |
 
 #### `main.c` Changes
 
@@ -137,7 +128,7 @@ int _write(int file, char *data, int len) {
 }
 
 /* After MX_SPI1_Init() */
-AD5940_MCUResourceInit(NULL);  // configures RST (PA4) and INT (PA0)
+AD5940_MCUResourceInit(NULL);  // deasserts CS + RST (GPIO already set up by CubeMX)
 
 /* In while(1) */
 AD5940_Main();  // runs the impedance sweep — has its own internal loop
@@ -158,6 +149,33 @@ AD5940_Main();  // runs the impedance sweep — has its own internal loop
 
 ---
 
+### Fix 3 — Duplicate `EXTI0_IRQHandler` After Adding PA0 in `.ioc`
+
+**Problem:** CubeMX regenerated `EXTI0_IRQHandler()` in `stm32f3xx_it.c` when PA0 was added as a GPIO EXTI0 pin. The port file `NUCLEOF303K8Port.c` also defined `EXTI0_IRQHandler()`, which would cause a **multiple definition linker error**.
+
+Additionally, `AD5940_MCUResourceInit()` was re-initializing PA4 and PA0 GPIOs that CubeMX now manages, causing redundant configuration.
+
+**Fix — `NUCLEOF303K8Port.c` (v1.1.0):**
+- Removed `EXTI0_IRQHandler()` entirely from the port file.
+- Replaced it with `AD5940_SetMCUIntFlag()` — a simple public function that sets the internal interrupt flag.
+- Simplified `AD5940_MCUResourceInit()` to only deassert CS and RST pins; all GPIO init is now handled by CubeMX.
+
+**Fix — `stm32f3xx_it.c`:**
+- Added `extern void AD5940_SetMCUIntFlag(void);` in USER CODE Includes.
+- Called `AD5940_SetMCUIntFlag()` inside the CubeMX-generated `EXTI0_IRQHandler()` USER CODE block.
+
+**Interrupt flow after fix:**
+```
+AD5940 pulls GP0/PA0 LOW
+  → EXTI0_IRQHandler()  in stm32f3xx_it.c  (CubeMX-owned)
+      → HAL_GPIO_EXTI_IRQHandler()          (clears EXTI pending bit)
+      → AD5940_SetMCUIntFlag()              (sets ucInterrupted = 1)
+  → AD5940_GetMCUIntFlag() returns 1 in AD5940_Main() loop
+  → AppIMPISR() processes FIFO data
+```
+
+---
+
 ## Git Commit History
 
 | Commit | Description |
@@ -165,13 +183,14 @@ AD5940_Main();  // runs the impedance sweep — has its own internal loop
 | `fix: remove duplicate Src/Inc/Startup folders from Impedance project` | Deleted legacy bare-metal folders |
 | `fix: update Impedance project include paths and source entries` | Fixed `.cproject` |
 | `feat: integrate AD5940 impedance library (ADI ad5940lib)` | Full AD5940 integration |
-| `docs: add Impedance project changelog` | This file |
+| `docs: move changelog into Impedance project, scope to Impedance only` | Changelog relocated |
+| `fix: resolve duplicate EXTI0_IRQHandler, wire AD5940 INT to CubeMX handler` | Fixed IRQ conflict after PA0 added to `.ioc` |
 
 ---
 
 ## Next Steps
 
-- [ ] Add **PA4** (RST) and **PA0** (INT) to `Impedance.ioc` and re-generate
+- [x] Add **PA4** (RST) and **PA0** (INT) to `Impedance.ioc` and re-generate
 - [ ] Connect physical AD5940/AD5941 evaluation board and verify SPI comms
 - [ ] Verify RCAL value matches the on-board calibration resistor
 - [ ] Tune HSTIA gain (`HstiaRtiaSel`) for target impedance range
