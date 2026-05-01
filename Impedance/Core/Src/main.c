@@ -21,8 +21,11 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
+/* AD5940 includes — uncomment when the IC is connected:
 #include "ad5940.h"
 #include "Impedance.h"
+*/
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -32,7 +35,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+/* Set TEST_MODE to 1 to run hardware self-test (LED + UART).
+   Set to 0 and uncomment AD5940 includes above to run the real measurement. */
+#define TEST_MODE  1
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -55,7 +60,9 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
-extern void AD5940_Main(void);   /* defined in AD5940Main.c */
+/* AD5940 entry point — uncomment when IC is connected:
+extern void AD5940_Main(void);
+*/
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -63,7 +70,7 @@ extern void AD5940_Main(void);   /* defined in AD5940Main.c */
 #include <errno.h>
 #include <sys/unistd.h>
 
-/* Redirect printf() to USART2 (Nucleo virtual COM port) */
+/* Redirect printf() to USART2 (Nucleo virtual COM port, 38400 baud) */
 int _write(int file, char *data, int len)
 {
   if ((file != STDOUT_FILENO) && (file != STDERR_FILENO))
@@ -74,6 +81,14 @@ int _write(int file, char *data, int len)
   HAL_UART_Transmit(&huart2, (uint8_t*)data, (uint16_t)len, HAL_MAX_DELAY);
   return len;
 }
+
+#if TEST_MODE
+/* LED is on PA8 (same pin as AD5940 CS — safe to use without the IC) */
+#define LED_PIN        GPIO_PIN_8
+#define LED_PORT       GPIOA
+#define BLINK_PERIOD   500u   /* ms — LED toggles every 500 ms = 1 Hz blink */
+#define PRINT_PERIOD   1000u  /* ms — UART status line every second */
+#endif /* TEST_MODE */
 /* USER CODE END 0 */
 
 /**
@@ -108,7 +123,19 @@ int main(void)
   MX_USART2_UART_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-  AD5940_MCUResourceInit(NULL);  /* Init RST + INT pins for AD5940 */
+#if TEST_MODE
+  /* --- Hardware self-test startup --- */
+  printf("\r\n=== Impedance Board Self-Test ===\r\n");
+  printf("USART2 OK  : 38400 baud, 8N1\r\n");
+  printf("LED        : PA8 (blink every %d ms)\r\n", BLINK_PERIOD);
+  printf("SPI1       : PB3/PB4/PB5 configured (AD5940 not connected)\r\n");
+  printf("Type any key to echo it back.\r\n");
+  printf("---------------------------------\r\n");
+#else
+  /* AD5940 resource init — uncomment when IC is connected:
+  AD5940_MCUResourceInit(NULL);
+  */
+#endif /* TEST_MODE */
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -118,7 +145,40 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    AD5940_Main(); /* Runs the impedance sweep — contains its own while(1) */
+#if TEST_MODE
+    /* ----- LED blink (non-blocking) ----- */
+    static uint32_t lastBlink = 0;
+    static uint32_t blinkCount = 0;
+    if ((HAL_GetTick() - lastBlink) >= BLINK_PERIOD)
+    {
+      lastBlink = HAL_GetTick();
+      HAL_GPIO_TogglePin(LED_PORT, LED_PIN);
+      blinkCount++;
+    }
+
+    /* ----- UART status print (every PRINT_PERIOD ms) ----- */
+    static uint32_t lastPrint = 0;
+    if ((HAL_GetTick() - lastPrint) >= PRINT_PERIOD)
+    {
+      lastPrint = HAL_GetTick();
+      printf("[%6lu ms] LED blinks: %lu | USART2 OK\r\n",
+             (unsigned long)HAL_GetTick(),
+             (unsigned long)blinkCount);
+    }
+
+    /* ----- UART echo (non-blocking, 1 byte at a time) ----- */
+    uint8_t rxByte = 0;
+    if (HAL_UART_Receive(&huart2, &rxByte, 1, 0) == HAL_OK)
+    {
+      /* Echo the character back with a label */
+      printf("ECHO < 0x%02X '%c' >\r\n", rxByte,
+             (rxByte >= 0x20 && rxByte < 0x7F) ? rxByte : '.');
+    }
+#else
+    /* AD5940 measurement — uncomment when IC is connected:
+    AD5940_Main();
+    */
+#endif /* TEST_MODE */
   }
   /* USER CODE END 3 */
 }

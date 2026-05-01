@@ -176,6 +176,65 @@ AD5940 pulls GP0/PA0 LOW
 
 ---
 
+### Feature — Hardware Self-Test Mode (`TEST_MODE`)
+
+**Purpose:** Validate USART2 and GPIO without the physical AD5940 IC. The test uses only components already available: the NUCLEO board and an external LED + resistor.
+
+**To switch between test mode and measurement mode:** change one line in `main.c`:
+```c
+#define TEST_MODE  1   /* 1 = self-test | 0 = AD5940 measurement */
+```
+
+#### Wiring for the test
+
+```
+PA8 ──[ 330 Ω ]──[ LED ]── GND
+```
+
+Connect an LED with a ~330 Ω series resistor between **PA8** (Arduino pin D7) and **GND**. PA8 is the AD5940 CS pin — it is safe to use it as an LED driver when the IC is not connected.
+
+#### What the test does
+
+| Test | Behaviour |
+|---|---|
+| **USART2 TX** | Prints a startup banner on power-on |
+| **LED blink** | PA8 toggles every **500 ms** (1 Hz blink rate) |
+| **UART status** | Prints `[tick ms] LED blinks: N | USART2 OK` once per second |
+| **UART echo** | Any character you type in the terminal is echoed back as `ECHO < 0xXX 'c' >` |
+
+#### Terminal settings (PuTTY / Tera Term / CubeIDE console)
+
+| Setting | Value |
+|---|---|
+| Port | Nucleo USB virtual COM (STLink VCP) |
+| Baud | **38400** |
+| Data | 8 bits, No parity, 1 stop bit (8N1) |
+| Flow control | None |
+
+#### Expected terminal output (example)
+
+```
+=== Impedance Board Self-Test ===
+USART2 OK  : 38400 baud, 8N1
+LED        : PA8 (blink every 500 ms)
+SPI1       : PB3/PB4/PB5 configured (AD5940 not connected)
+Type any key to echo it back.
+---------------------------------
+[  1001 ms] LED blinks: 2 | USART2 OK
+[  2001 ms] LED blinks: 4 | USART2 OK
+ECHO < 0x41 'A' >
+[  3001 ms] LED blinks: 6 | USART2 OK
+```
+
+#### Switching to AD5940 mode (when IC is available)
+
+1. Set `#define TEST_MODE 0` in `main.c`
+2. Uncomment the AD5940 `#include` lines in USER CODE Includes
+3. Uncomment `AD5940_MCUResourceInit(NULL)` in USER CODE 2
+4. Uncomment `AD5940_Main()` in USER CODE 3
+
+---
+
 ## Git Commit History
 
 | Commit | Description |
@@ -185,14 +244,18 @@ AD5940 pulls GP0/PA0 LOW
 | `feat: integrate AD5940 impedance library (ADI ad5940lib)` | Full AD5940 integration |
 | `docs: move changelog into Impedance project, scope to Impedance only` | Changelog relocated |
 | `fix: resolve duplicate EXTI0_IRQHandler, wire AD5940 INT to CubeMX handler` | Fixed IRQ conflict after PA0 added to `.ioc` |
+| `docs: update changelog with PA0/PA4 ioc config and EXTI0 fix` | Changelog update |
+| `feat: add hardware self-test mode (LED blink + UART echo)` | Test program for use without AD5940 |
 
 ---
 
 ## Next Steps
 
 - [x] Add **PA4** (RST) and **PA0** (INT) to `Impedance.ioc` and re-generate
-- [ ] Connect physical AD5940/AD5941 evaluation board and verify SPI comms
+- [x] Verify UART output with self-test mode
+- [x] Verify LED blink with self-test mode
+- [ ] Connect physical AD5940/AD5941 evaluation board
+- [ ] Set `TEST_MODE 0` and verify SPI communication with AD5940
 - [ ] Verify RCAL value matches the on-board calibration resistor
 - [ ] Tune HSTIA gain (`HstiaRtiaSel`) for target impedance range
-- [ ] View results in a terminal (e.g. PuTTY at 38400 baud) or the ADI SensorPal GUI
 - [ ] Consider DMA-based SPI for higher data throughput
