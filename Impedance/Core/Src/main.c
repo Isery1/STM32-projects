@@ -69,6 +69,7 @@ extern void AD5940_Main(void);
 /* USER CODE BEGIN 0 */
 #include <errno.h>
 #include <sys/unistd.h>
+#include <sys/stat.h>
 
 /* Redirect printf() to USART2 (Nucleo virtual COM port, 38400 baud) */
 int _write(int file, char *data, int len)
@@ -81,6 +82,13 @@ int _write(int file, char *data, int len)
   HAL_UART_Transmit(&huart2, (uint8_t*)data, (uint16_t)len, HAL_MAX_DELAY);
   return len;
 }
+
+/* Minimal syscall stubs to satisfy linker when using printf */
+int _read(int file, char *ptr, int len) { return 0; }
+int _fstat(int file, struct stat *st) { st->st_mode = S_IFCHR; return 0; }
+int _isatty(int file) { return 1; }
+int _lseek(int file, int ptr, int dir) { return 0; }
+int _close(int file) { return -1; }
 
 #if TEST_MODE
 /* LED is on PA8 (same pin as AD5940 CS — safe to use without the IC) */

@@ -258,6 +258,15 @@ ECHO < 0x41 'A' >
 | `fix: add direct UART heartbeat and startup LED pulse` | Debugged silent startup issues |
 | `fix: restore missing startup_stm32f303k8tx.s` | Fixed Reset_Handler linker error |
 | `feat: add SPI loopback test to hardware self-test` | Added PB4-PB5 jumper test |
+| `fix: add missing syscall stubs for printf` | Fixed linker errors (_read, _close, etc) |
+
+---
+
+### Fix 7 — Missing Syscall Stubs for `printf`
+
+**Problem:** When using `printf` with `nano.specs`, the linker requires implementations for several system calls (`_read`, `_close`, `_fstat`, `_isatty`, `_lseek`). Without these, the build fails with "undefined reference" errors.
+
+**Fix:** Added minimal stubs for these functions in `main.c` (USER CODE 0) to satisfy the linker.
 
 ---
 
