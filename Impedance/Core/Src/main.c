@@ -132,6 +132,7 @@ int main(void)
   printf("=== Impedance Board Self-Test ===\r\n");
   printf("USART2 OK  : 38400 baud, 8N1\r\n");
   printf("LED        : PA8 (D7 on headers) blinking at 1Hz\r\n");
+  printf("SPI1       : PB3/PB4/PB5 (Jumper PB4 to PB5 for loopback test)\r\n");
   printf("---------------------------------\r\n");
 
   /* Quick LED pulse to verify code is running */
@@ -163,14 +164,24 @@ int main(void)
       blinkCount++;
     }
 
-    /* ----- UART status print (every PRINT_PERIOD ms) ----- */
+    /* ----- UART/SPI status print (every PRINT_PERIOD ms) ----- */
     static uint32_t lastPrint = 0;
     if ((HAL_GetTick() - lastPrint) >= PRINT_PERIOD)
     {
       lastPrint = HAL_GetTick();
-      printf("[%6lu ms] LED blinks: %lu | USART2 OK\r\n",
+
+      /* SPI Test: Transmit 0xAA and see what we get back */
+      uint8_t spiTx = 0xAA;
+      uint8_t spiRx = 0x00;
+      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET); // CS Low (for test)
+      HAL_SPI_TransmitReceive(&hspi1, &spiTx, &spiRx, 1, 10);
+      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);   // CS High
+
+      printf("[%6lu ms] LED blinks: %lu | SPI RX: 0x%02X\r\n",
              (unsigned long)HAL_GetTick(),
-             (unsigned long)blinkCount);
+             (unsigned long)blinkCount,
+             spiRx);
+      if (spiRx == 0xAA) printf("           >> SPI Loopback SUCCESS!\r\n");
     }
 
     /* ----- UART echo (non-blocking, 1 byte at a time) ----- */

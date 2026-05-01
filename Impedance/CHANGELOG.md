@@ -257,6 +257,18 @@ ECHO < 0x41 'A' >
 | `fix: add missing CHIPSEL_594X symbol to .cproject` | Resolved library #error |
 | `fix: add direct UART heartbeat and startup LED pulse` | Debugged silent startup issues |
 | `fix: restore missing startup_stm32f303k8tx.s` | Fixed Reset_Handler linker error |
+| `feat: add SPI loopback test to hardware self-test` | Added PB4-PB5 jumper test |
+
+---
+
+### SPI Loopback Test Feature
+
+**Description:** To verify that the SPI1 peripheral is correctly configured and the pins (PB3, PB4, PB5) are active, a loopback test was added to the `TEST_MODE`.
+
+**How to use:** 
+1. Connect a jumper wire between **PB4 (MISO)** and **PB5 (MOSI)** on the Nucleo board.
+2. The UART console will display `SPI RX: 0xAA` and `>> SPI Loopback SUCCESS!`.
+3. If no jumper is connected, it will likely show `SPI RX: 0x00` or `0xFF`.
 
 ---
 
