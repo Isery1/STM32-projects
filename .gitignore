@@ -21,3 +21,6 @@
 *.obj
 *.i
 *.axf
+
+# AD5940 examples clone (files copied into Core/ directly)
+Impedance/ad5940-examples/

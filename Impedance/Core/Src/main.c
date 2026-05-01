@@ -21,7 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "ad5940.h"
+#include "Impedance.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,12 +55,25 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
-
+extern void AD5940_Main(void);   /* defined in AD5940Main.c */
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+#include <errno.h>
+#include <sys/unistd.h>
 
+/* Redirect printf() to USART2 (Nucleo virtual COM port) */
+int _write(int file, char *data, int len)
+{
+  if ((file != STDOUT_FILENO) && (file != STDERR_FILENO))
+  {
+    errno = EBADF;
+    return -1;
+  }
+  HAL_UART_Transmit(&huart2, (uint8_t*)data, (uint16_t)len, HAL_MAX_DELAY);
+  return len;
+}
 /* USER CODE END 0 */
 
 /**
@@ -94,7 +108,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-
+  AD5940_MCUResourceInit(NULL);  /* Init RST + INT pins for AD5940 */
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -104,6 +118,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    AD5940_Main(); /* Runs the impedance sweep — contains its own while(1) */
   }
   /* USER CODE END 3 */
 }
