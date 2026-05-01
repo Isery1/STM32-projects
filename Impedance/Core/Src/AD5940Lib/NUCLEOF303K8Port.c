@@ -1,19 +1,20 @@
 /**
  * @file       NUCLEOF303K8Port.c
  * @brief      STM32F303K8 (Nucleo-F303K8) port for the AD5940/AD5941 library.
- * @version    V1.0.0
+ * @version    V1.1.0
  * @author     Adapted from ADI NUCLEO-F411 port
  *
- * Pin mapping (SPI1 already configured in .ioc):
+ * Pin mapping — all pins now configured by CubeMX via .ioc:
  *   SPI1_SCK  -> PB3 (Arduino D13)
  *   SPI1_MISO -> PB4 (Arduino D12)
  *   SPI1_MOSI -> PB5 (Arduino D11)
- *   AD5940_CS  -> PA8 (Arduino D7)  - GPIO output, already configured in .ioc
- *   AD5940_RST -> PA4 (Arduino D3)  - GPIO output, add manually
- *   AD5940_INT -> PA0 (Arduino A0)  - GPIO EXTI falling edge
+ *   AD5940_CS  -> PA8 (Arduino D7)  - GPIO Output, configured in .ioc
+ *   AD5940_RST -> PA4 (Arduino D3)  - GPIO Output HIGH, configured in .ioc
+ *   AD5940_INT -> PA0 (Arduino A0)  - GPIO EXTI0 Falling + NVIC, configured in .ioc
  *
- * IMPORTANT: After adding this file, update the .ioc to configure PA4 as
- * GPIO_Output and PA0 as GPIO_EXTI_Falling, then re-generate.
+ * NOTE: EXTI0_IRQHandler lives in stm32f3xx_it.c (CubeMX-generated).
+ *       It calls AD5940_SetMCUIntFlag() which is defined here.
+ *       AD5940_MCUResourceInit() is a no-op for GPIO — CubeMX handles that.
  */
 
 #include "ad5940.h"
@@ -27,20 +28,16 @@
 /* SPI peripheral — must match MX_SPI1_Init() in main.c */
 #define AD5940SPI                       SPI1
 
-/* CS — PA8 is already configured as GPIO_Output in .ioc */
+/* CS — PA8, GPIO Output configured in .ioc */
 #define AD5940_CS_PIN                   GPIO_PIN_8
 #define AD5940_CS_GPIO_PORT             GPIOA
 
-/* RST — PA4, configure as GPIO_Output in .ioc */
+/* RST — PA4, GPIO Output HIGH configured in .ioc */
 #define AD5940_RST_PIN                  GPIO_PIN_4
 #define AD5940_RST_GPIO_PORT            GPIOA
-#define AD5940_RST_GPIO_CLK_ENABLE()    __HAL_RCC_GPIOA_CLK_ENABLE()
 
-/* GP0 Interrupt from AD5940 — PA0, EXTI line 0 */
+/* GP0 Interrupt — PA0, EXTI0 Falling + NVIC configured in .ioc */
 #define AD5940_GP0INT_PIN               GPIO_PIN_0
-#define AD5940_GP0INT_GPIO_PORT         GPIOA
-#define AD5940_GP0INT_GPIO_CLK_ENABLE() __HAL_RCC_GPIOA_CLK_ENABLE()
-#define AD5940_GP0INT_IRQn              EXTI0_IRQn
 
 /* ------------------------------------------------------------------ */
 /*  SysTick timing                                                     */
@@ -115,48 +112,23 @@ uint32_t AD5940_ClrMCUIntFlag(void)
 }
 
 /**
- * @brief  Initialise MCU resources needed by the AD5940 driver.
- *         SPI1 and CS/SCK/MISO/MOSI are already configured by MX_SPI1_Init()
- *         and MX_GPIO_Init() in main.c.
- *         This function only adds RST and INT pins.
+ * @brief  Called from main.c after MX_GPIO_Init() and MX_SPI1_Init().
+ *         CubeMX already configured PA4 (RST), PA0 (EXTI0) and NVIC,
+ *         so this function only ensures the initial pin states are correct.
  */
 uint32_t AD5940_MCUResourceInit(void *pCfg)
 {
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-    /* RST pin — PA4 as push-pull output */
-    AD5940_RST_GPIO_CLK_ENABLE();
-    HAL_GPIO_WritePin(AD5940_RST_GPIO_PORT, AD5940_RST_PIN, GPIO_PIN_SET);
-    GPIO_InitStruct.Pin   = AD5940_RST_PIN;
-    GPIO_InitStruct.Mode  = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull  = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(AD5940_RST_GPIO_PORT, &GPIO_InitStruct);
-
-    /* INT pin — PA0 as EXTI falling edge */
-    AD5940_GP0INT_GPIO_CLK_ENABLE();
-    GPIO_InitStruct.Pin   = AD5940_GP0INT_PIN;
-    GPIO_InitStruct.Mode  = GPIO_MODE_IT_FALLING;
-    GPIO_InitStruct.Pull  = GPIO_PULLUP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(AD5940_GP0INT_GPIO_PORT, &GPIO_InitStruct);
-
-    /* Enable EXTI0 interrupt */
-    HAL_NVIC_SetPriority(AD5940_GP0INT_IRQn, 5, 0);
-    HAL_NVIC_EnableIRQ(AD5940_GP0INT_IRQn);
-
-    /* Deassert CS and RST (both active-low) */
+    /* CS and RST are both active-low — deassert them at startup */
     AD5940_CsSet();
     AD5940_RstSet();
-
     return 0;
 }
 
 /* ------------------------------------------------------------------ */
-/*  External interrupt handler for AD5940 GP0 → PA0 (EXTI0)          */
+/*  Public flag setter — called from EXTI0_IRQHandler in              */
+/*  stm32f3xx_it.c (USER CODE section)                                */
 /* ------------------------------------------------------------------ */
-void EXTI0_IRQHandler(void)
+void AD5940_SetMCUIntFlag(void)
 {
     ucInterrupted = 1;
-    __HAL_GPIO_EXTI_CLEAR_IT(AD5940_GP0INT_PIN);
 }
