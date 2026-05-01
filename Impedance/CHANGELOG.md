@@ -235,6 +235,14 @@ ECHO < 0x41 'A' >
 
 ---
 
+### Fix 4 — Missing `CHIPSEL_594X` Compiler Symbol
+
+**Problem:** The AD5940 library header `ad5940.h` checks for a chip selection define. If neither `CHIPSEL_M355` nor `CHIPSEL_594X` is defined, it throws a `#error`. This caused the project to fail building as soon as the library was included.
+
+**Fix:** Added `CHIPSEL_594X` to the **Defined Symbols (-D)** in `.cproject` for both Debug and Release configurations. This selects the AD5940/AD5941 chip family support in the driver.
+
+---
+
 ## Git Commit History
 
 | Commit | Description |
@@ -246,6 +254,7 @@ ECHO < 0x41 'A' >
 | `fix: resolve duplicate EXTI0_IRQHandler, wire AD5940 INT to CubeMX handler` | Fixed IRQ conflict after PA0 added to `.ioc` |
 | `docs: update changelog with PA0/PA4 ioc config and EXTI0 fix` | Changelog update |
 | `feat: add hardware self-test mode (LED blink + UART echo)` | Test program for use without AD5940 |
+| `fix: add missing CHIPSEL_594X symbol to .cproject` | Resolved library #error |
 
 ---
 
