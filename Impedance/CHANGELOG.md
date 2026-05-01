@@ -255,6 +255,15 @@ ECHO < 0x41 'A' >
 | `docs: update changelog with PA0/PA4 ioc config and EXTI0 fix` | Changelog update |
 | `feat: add hardware self-test mode (LED blink + UART echo)` | Test program for use without AD5940 |
 | `fix: add missing CHIPSEL_594X symbol to .cproject` | Resolved library #error |
+| `fix: add direct UART heartbeat and startup LED pulse` | Debugged silent startup issues |
+
+---
+
+### Fix 5 — Hardware Heartbeat Debugging
+
+**Problem:** The user reported no LED blinking and no UART output. This could be due to `printf` initialization order or looking at the wrong LED.
+
+**Fix:** Added a direct `HAL_UART_Transmit` call at the very beginning of the application (bypassing `printf`) and a 100ms startup pulse on the test LED (PA8). Clarified that the test LED is on pin **D7** of the headers, as the on-board LED (PB3) is shared with SPI.
 
 ---
 

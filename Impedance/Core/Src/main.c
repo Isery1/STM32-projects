@@ -125,12 +125,19 @@ int main(void)
   /* USER CODE BEGIN 2 */
 #if TEST_MODE
   /* --- Hardware self-test startup --- */
-  printf("\r\n=== Impedance Board Self-Test ===\r\n");
+  HAL_Delay(100); // Wait for UART to stabilize
+  uint8_t testMsg[] = "\r\n--- HW ALIVE ---\r\n";
+  HAL_UART_Transmit(&huart2, testMsg, sizeof(testMsg)-1, 100);
+
+  printf("=== Impedance Board Self-Test ===\r\n");
   printf("USART2 OK  : 38400 baud, 8N1\r\n");
-  printf("LED        : PA8 (blink every %d ms)\r\n", BLINK_PERIOD);
-  printf("SPI1       : PB3/PB4/PB5 configured (AD5940 not connected)\r\n");
-  printf("Type any key to echo it back.\r\n");
+  printf("LED        : PA8 (D7 on headers) blinking at 1Hz\r\n");
   printf("---------------------------------\r\n");
+
+  /* Quick LED pulse to verify code is running */
+  HAL_GPIO_WritePin(LED_PORT, LED_PIN, GPIO_PIN_SET);
+  HAL_Delay(100);
+  HAL_GPIO_WritePin(LED_PORT, LED_PIN, GPIO_PIN_RESET);
 #else
   /* AD5940 resource init — uncomment when IC is connected:
   AD5940_MCUResourceInit(NULL);
