@@ -453,30 +453,34 @@
       // Pick a random new image from the unused pool
       const newImage = unusedPool[Math.floor(Math.random() * unusedPool.length)];
 
-      // 1. Fade out the target slot
-      targetItem.style.opacity = '0';
+      // Preload the image in the background before starting the fade transition!
+      const preloader = new Image();
+      preloader.src = newImage.src;
+      preloader.onload = () => {
+        // Only fade out and swap once the image is completely loaded in memory
+        targetItem.style.opacity = '0';
 
-      // 2. Wait for the fade-out to complete (800ms) before swapping
-      setTimeout(() => {
-        // Swap image src
-        const imgElement = targetItem.querySelector('img');
-        if (imgElement) {
-          imgElement.src = newImage.src;
-        }
-
-        // Update the visible list tracker
-        visibleImages[slotIndex] = newImage;
-
-        // Update click event for the new image src
-        const newItem = targetItem.cloneNode(true);
-        newItem.addEventListener('click', () => openLightbox(newImage.src));
-        targetItem.replaceWith(newItem);
-
-        // 3. Fade back in
+        // Wait for the fade-out to complete (800ms) before swapping
         setTimeout(() => {
-          newItem.style.opacity = '1';
-        }, 50);
-      }, 800);
+          const imgElement = targetItem.querySelector('img');
+          if (imgElement) {
+            imgElement.src = newImage.src;
+          }
+
+          // Update the visible list tracker
+          visibleImages[slotIndex] = newImage;
+
+          // Update click event for the new image src
+          const newItem = targetItem.cloneNode(true);
+          newItem.addEventListener('click', () => openLightbox(newImage.src));
+          targetItem.replaceWith(newItem);
+
+          // Fade back in
+          setTimeout(() => {
+            newItem.style.opacity = '1';
+          }, 50);
+        }, 800);
+      };
     }
 
     // --- Filter buttons ---
