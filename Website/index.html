@@ -423,9 +423,10 @@
         item.className = 'gallery__item';
         item.style.opacity = '1';
         item.setAttribute('data-index', i);
-        item.innerHTML = `<img src="${img.src}" alt="Framegeist" loading="lazy">`;
+        const thumbSrc = img.src.replace('/', '/thumbnails/');
+        item.innerHTML = `<img src="${thumbSrc}" alt="Framegeist" loading="lazy">`;
         
-        // When clicked, open lightbox for this image's src
+        // When clicked, open lightbox for this image's original full-res src
         item.addEventListener('click', () => openLightbox(img.src));
         grid.appendChild(item);
       });
@@ -453,9 +454,10 @@
       // Pick a random new image from the unused pool
       const newImage = unusedPool[Math.floor(Math.random() * unusedPool.length)];
 
-      // Preload the image in the background before starting the fade transition!
+      // Preload the lightweight thumbnail in the background before starting the fade transition!
       const preloader = new Image();
-      preloader.src = newImage.src;
+      const thumbSrc = newImage.src.replace('/', '/thumbnails/');
+      preloader.src = thumbSrc;
       preloader.onload = () => {
         // Only fade out and swap once the image is completely loaded in memory
         targetItem.style.opacity = '0';
@@ -464,13 +466,13 @@
         setTimeout(() => {
           const imgElement = targetItem.querySelector('img');
           if (imgElement) {
-            imgElement.src = newImage.src;
+            imgElement.src = thumbSrc;
           }
 
           // Update the visible list tracker
           visibleImages[slotIndex] = newImage;
 
-          // Update click event for the new image src
+          // Update click event for the new image original full-res src
           const newItem = targetItem.cloneNode(true);
           newItem.addEventListener('click', () => openLightbox(newImage.src));
           targetItem.replaceWith(newItem);
