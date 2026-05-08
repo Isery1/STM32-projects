@@ -400,6 +400,17 @@
       return arr;
     }
 
+    // Helper to generate a foolproof thumbnail source URL regardless of absolute/relative prefixes
+    function getThumbSrc(src) {
+      if (src.includes('Babyfotos D&T/')) {
+        return src.replace('Babyfotos D&T/', 'Babyfotos D&T/thumbnails/');
+      }
+      if (src.includes('Fotos/')) {
+        return src.replace('Fotos/', 'Fotos/thumbnails/');
+      }
+      return src;
+    }
+
     // --- Populate gallery ---
     function renderGallery(filter) {
       const grid = document.getElementById('galleryGrid');
@@ -423,7 +434,7 @@
         item.className = 'gallery__item';
         item.style.opacity = '1';
         item.setAttribute('data-index', i);
-        const thumbSrc = img.src.replace('/', '/thumbnails/');
+        const thumbSrc = getThumbSrc(img.src);
         item.innerHTML = `<img src="${thumbSrc}" alt="Framegeist" loading="lazy">`;
         
         // When clicked, open lightbox for this image's original full-res src
@@ -456,8 +467,14 @@
 
       // Preload the lightweight thumbnail in the background before starting the fade transition!
       const preloader = new Image();
-      const thumbSrc = newImage.src.replace('/', '/thumbnails/');
+      const thumbSrc = getThumbSrc(newImage.src);
       preloader.src = thumbSrc;
+      
+      // Fallback in case loading fails: prevent invisible square
+      preloader.onerror = () => {
+        targetItem.style.opacity = '1';
+      };
+      
       preloader.onload = () => {
         // Only fade out and swap once the image is completely loaded in memory
         targetItem.style.opacity = '0';
