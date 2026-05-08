@@ -754,8 +754,13 @@ a:hover { color: var(--clr-gold-light); }
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
   flex-shrink: 0;
+}
+
+.contact__details li .icon svg {
+  width: 18px;
+  height: 18px;
+  color: var(--clr-gold);
 }
 
 .contact__form {
@@ -881,6 +886,11 @@ a:hover { color: var(--clr-gold-light); }
   color: var(--clr-text-muted);
   font-size: 0.9rem;
   transition: all var(--transition);
+}
+
+.footer__social a svg {
+  width: 16px;
+  height: 16px;
 }
 
 .footer__social a:hover {
