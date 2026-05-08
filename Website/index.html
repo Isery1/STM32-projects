@@ -51,7 +51,18 @@
   <!-- ========== HERO ========== -->
   <section class="hero" id="home">
     <div class="hero__bg">
-      <img src="Babyfotos D&T/1-IMG_6908.jpg" alt="Framegeist — Fotografie">
+      <div class="hero__slide active">
+        <img src="Babyfotos D&T/1-IMG_6908.jpg" alt="Framegeist — Neugeborene">
+      </div>
+      <div class="hero__slide">
+        <img src="Fotos/IMG_5615.JPG" alt="Framegeist — Hochzeit">
+      </div>
+      <div class="hero__slide">
+        <img src="Fotos/IMG_6587.JPG" alt="Framegeist — Wildlife">
+      </div>
+      <div class="hero__slide">
+        <img src="Babyfotos D&T/28-IMG_7145.jpg" alt="Framegeist — Porträt">
+      </div>
     </div>
     <div class="hero__overlay"></div>
     <div class="hero__content">
@@ -586,6 +597,18 @@
         }
       });
     });
+
+    // --- Hero Background Slideshow ---
+    const slides = document.querySelectorAll('.hero__slide');
+    let currentSlideIndex = 0;
+
+    function nextSlide() {
+      slides[currentSlideIndex].classList.remove('active');
+      currentSlideIndex = (currentSlideIndex + 1) % slides.length;
+      slides[currentSlideIndex].classList.add('active');
+    }
+
+    setInterval(nextSlide, 5000); // Cycle every 5 seconds
 
     // --- Initial render ---
     renderGallery('all');
