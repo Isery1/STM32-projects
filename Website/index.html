@@ -6,6 +6,10 @@
   <title>Framegeist | Porträt- & Wildlife-Fotografie</title>
   <meta name="description" content="Framegeist | Professionelle Porträt- und Wildlife-Fotografie aus Graz. Portraits, Neugeborenenfotos und Tieraufnahmen.">
   <link rel="stylesheet" href="style.css">
+  <!-- Favicon / Tab-Symbol -->
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <script>
     // Set initial language class on body before page render to avoid layout shift
     const savedLang = localStorage.getItem('preferredLang') || 'de';
@@ -562,14 +566,51 @@
       currentIndex = filteredPool.findIndex(img => img.src === src);
       if (currentIndex === -1) currentIndex = 0;
 
-      lightboxImg.src = filteredPool[currentIndex].src;
+      // Add loading state immediately to prevent old image flash
+      lightboxImg.classList.add('loading');
       lightbox.classList.add('active');
       document.body.style.overflow = 'hidden';
+
+      // Load image source smoothly
+      updateLightboxImage();
+    }
+
+    function updateLightboxImage() {
+      const imgUrl = filteredPool[currentIndex].src;
+      lightboxImg.classList.add('loading');
+
+      const tempImg = new Image();
+      tempImg.src = imgUrl;
+      tempImg.onload = () => {
+        // Only render and fade-in once fully loaded in memory!
+        lightboxImg.src = imgUrl;
+        lightboxImg.classList.remove('loading');
+
+        // Preload next and previous full-res images in background for instant browsing
+        preloadNeighbors();
+      };
+    }
+
+    function preloadNeighbors() {
+      if (filteredPool.length <= 1) return;
+      const nextIdx = (currentIndex + 1) % filteredPool.length;
+      const prevIdx = (currentIndex - 1 + filteredPool.length) % filteredPool.length;
+
+      const nImg = new Image();
+      nImg.src = filteredPool[nextIdx].src;
+
+      const pImg = new Image();
+      pImg.src = filteredPool[prevIdx].src;
     }
 
     function closeLightbox() {
       lightbox.classList.remove('active');
       document.body.style.overflow = '';
+      // Clear image source after closing to free memory and prevent flashes next time
+      setTimeout(() => {
+        lightboxImg.src = '';
+        lightboxImg.classList.add('loading');
+      }, 400);
     }
 
     document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
@@ -580,13 +621,13 @@
     document.getElementById('lightboxPrev').addEventListener('click', (e) => {
       e.stopPropagation();
       currentIndex = (currentIndex - 1 + filteredPool.length) % filteredPool.length;
-      lightboxImg.src = filteredPool[currentIndex].src;
+      updateLightboxImage();
     });
 
     document.getElementById('lightboxNext').addEventListener('click', (e) => {
       e.stopPropagation();
       currentIndex = (currentIndex + 1) % filteredPool.length;
-      lightboxImg.src = filteredPool[currentIndex].src;
+      updateLightboxImage();
     });
 
     document.addEventListener('keydown', (e) => {
