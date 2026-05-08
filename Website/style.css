@@ -371,17 +371,7 @@ a:hover { color: var(--clr-gold-light); }
   overflow: hidden;
 }
 
-.about__image-wrapper::before {
-  content: '';
-  position: absolute;
-  top: -20px;
-  left: -20px;
-  right: 20px;
-  bottom: 20px;
-  border: 1px solid var(--clr-gold-dark);
-  z-index: 1;
-  pointer-events: none;
-}
+/* Portrait border removed */
 
 .about__image {
   width: 100%;
@@ -487,13 +477,13 @@ a:hover { color: var(--clr-gold-light); }
 
 /* Gallery grid */
 .gallery__grid {
-  columns: 3;
-  column-gap: var(--space-sm);
+  columns: 4;
+  column-gap: 10px;
 }
 
 .gallery__item {
   break-inside: avoid;
-  margin-bottom: var(--space-sm);
+  margin-bottom: 10px;
   position: relative;
   overflow: hidden;
   cursor: pointer;
