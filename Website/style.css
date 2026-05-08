@@ -315,15 +315,48 @@ a:hover { color: var(--clr-gold-light); }
   margin-top: var(--space-md);
 }
 
-.hero__scroll-line {
-  width: 1px;
-  height: 50px;
-  background: linear-gradient(to bottom, var(--clr-gold), transparent);
+/* Scroll Indicator Capsule */
+.scroll-indicator {
+  width: 22px;
+  height: 38px;
+  border: 1px solid rgba(201, 168, 108, 0.4);
+  border-radius: 12px;
+  position: relative;
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+  transition: border-color var(--transition);
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(8px); }
+.hero__scroll:hover .scroll-indicator {
+  border-color: var(--clr-gold);
+}
+
+.scroll-indicator__dot {
+  width: 4px;
+  height: 8px;
+  background: var(--clr-gold);
+  border-radius: 2px;
+  position: absolute;
+  top: 6px;
+  animation: scrollDot 2.2s cubic-bezier(0.15, 0.41, 0.69, 0.94) infinite;
+}
+
+@keyframes scrollDot {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+  }
+  60% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 /* --- Section Headers --- */
