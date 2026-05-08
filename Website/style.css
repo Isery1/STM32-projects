@@ -215,7 +215,7 @@ a:hover { color: var(--clr-gold-light); }
   height: 100%;
   object-fit: cover;
   object-position: center 30%;
-  filter: brightness(0.35) contrast(1.1);
+  filter: brightness(0.48) contrast(1.05);
   transform: scale(1.05);
 }
 
@@ -387,6 +387,7 @@ a:hover { color: var(--clr-gold-light); }
   width: 100%;
   height: 550px;
   object-fit: cover;
+  object-position: center 20%;
   transition: transform var(--transition-slow);
 }
 
