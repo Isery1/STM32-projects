@@ -430,6 +430,17 @@ a:hover { color: var(--clr-gold-light); }
   letter-spacing: 0.02em;
 }
 
+.about__quote-text small {
+  display: block;
+  font-family: var(--ff-body);
+  font-size: var(--fs-xs);
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--clr-text-dim);
+  margin-top: var(--space-xs);
+}
+
 /* --- Gallery Section --- */
 
 /* Gallery filter buttons */
