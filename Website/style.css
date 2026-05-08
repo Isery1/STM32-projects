@@ -1035,3 +1035,32 @@ a:hover { color: var(--clr-gold-light); }
   .lightbox__prev { left: 10px; }
   .lightbox__next { right: 10px; }
 }
+
+/* --- Language Switcher --- */
+.lang-switcher {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--ff-body);
+  font-size: 0.8rem;
+  color: var(--clr-text-dim);
+}
+.lang-btn {
+  background: none;
+  border: none;
+  color: var(--clr-text-muted);
+  cursor: pointer;
+  font-weight: 500;
+  padding: 0.2rem;
+  transition: var(--transition);
+}
+.lang-btn:hover {
+  color: var(--clr-text);
+}
+.lang-btn.active {
+  color: var(--clr-gold);
+  font-weight: 600;
+}
+
+body.lang-de .lang-en { display: none !important; }
+body.lang-en .lang-de { display: none !important; }

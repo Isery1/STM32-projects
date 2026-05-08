@@ -6,8 +6,13 @@
   <title>Framegeist — Porträt- & Wildlife-Fotografie</title>
   <meta name="description" content="Framegeist — Professionelle Porträt- und Wildlife-Fotografie aus Graz. Intime Portraits, berührende Neugeborenenfotos und majestätische Tieraufnahmen.">
   <link rel="stylesheet" href="style.css">
+  <script>
+    // Set initial language class on body before page render to avoid layout shift
+    const savedLang = localStorage.getItem('preferredLang') || 'de';
+    document.documentElement.className = 'lang-' + savedLang;
+  </script>
 </head>
-<body>
+<body class="lang-de">
 
   <!-- ========== NAVIGATION ========== -->
   <nav class="nav" id="nav">
@@ -15,11 +20,28 @@
       <a href="#" class="nav__logo">Frame<span>geist</span></a>
       <ul class="nav__links" id="navLinks">
         <li><a href="#home">Home</a></li>
-        <li><a href="#about">Über mich</a></li>
-        <li><a href="#gallery">Portfolio</a></li>
-        <li><a href="#services">Leistungen</a></li>
-        <li><a href="#contact">Kontakt</a></li>
+        <li><a href="#about">
+          <span class="lang-de">Über mich</span>
+          <span class="lang-en">About Me</span>
+        </a></li>
+        <li><a href="#gallery">
+          <span class="lang-de">Portfolio</span>
+          <span class="lang-en">Portfolio</span>
+        </a></li>
+        <li><a href="#services">
+          <span class="lang-de">Leistungen</span>
+          <span class="lang-en">Services</span>
+        </a></li>
+        <li><a href="#contact">
+          <span class="lang-de">Kontakt</span>
+          <span class="lang-en">Contact</span>
+        </a></li>
       </ul>
+      <div class="lang-switcher">
+        <button class="lang-btn active" data-lang="de">DE</button>
+        <span>/</span>
+        <button class="lang-btn" data-lang="en">EN</button>
+      </div>
       <button class="nav__toggle" id="navToggle" aria-label="Menü">
         <span></span><span></span><span></span>
       </button>
@@ -29,15 +51,23 @@
   <!-- ========== HERO ========== -->
   <section class="hero" id="home">
     <div class="hero__bg">
-      <img src="Fotos/IMG_6035.JPG" alt="Afrikanischer Sonnenuntergang — Namibia">
+      <img src="Fotos/IMG_5615.JPG" alt="Elegantes Hochzeitspaar — Framegeist">
     </div>
     <div class="hero__overlay"></div>
     <div class="hero__content">
-      <p class="hero__tagline">Die Essenz des Augenblicks</p>
-      <h1 class="hero__title">Momente<br><em>festhalten</em></h1>
-      <p class="hero__subtitle">Die Seele des Augenblicks eingefangen — von der wilden Majestät der Natur bis zur intimen Tiefe des menschlichen Portraits.</p>
+      <p class="hero__tagline">
+        <span class="lang-de">Die Essenz des Augenblicks</span>
+        <span class="lang-en">The Essence of the Moment</span>
+      </p>
+      <h1 class="hero__title lang-de">Momente<br><em>festhalten</em></h1>
+      <h1 class="hero__title lang-en">Capturing<br><em>moments</em></h1>
+      <p class="hero__subtitle">
+        <span class="lang-de">Die Seele des Augenblicks eingefangen — von der wilden Majestät der Natur bis zur intimen Tiefe des menschlichen Portraits.</span>
+        <span class="lang-en">Capturing the soul of the moment — from the wild majesty of nature to the intimate depth of human portraits.</span>
+      </p>
       <a href="#gallery" class="hero__scroll">
-        <span>Entdecken</span>
+        <span class="lang-de">Entdecken</span>
+        <span class="lang-en">Discover</span>
         <span class="hero__scroll-line"></span>
       </a>
     </div>
@@ -51,24 +81,48 @@
           <img class="about__image" src="Babyfotos D&T/28-IMG_7145.jpg" alt="Framegeist — Fotografie">
         </div>
         <div class="about__text reveal">
-          <div class="section-label">Über mich</div>
+          <div class="section-label">
+            <span class="lang-de">Über mich</span>
+            <span class="lang-en">About Me</span>
+          </div>
           <h2>Frame<em>geist</em></h2>
-          <p class="about__role">Fotograf · Graz, Österreich</p>
-          <p>Fotografie ist für mich weit mehr als nur das Drücken des Auslösers — es ist die Kunst, die echte Essenz eines Augenblicks einzufangen. Was einst als leidenschaftliche Faszination begann, hat sich über die Jahre zu einer tiefen Hingabe entwickelt, die technische Präzision mit feinem Gespür für die ungestellte Emotion verbindet.</p>
-          <p>Unter dem Namen <strong>Framegeist</strong> konzentriere ich mich ganz auf zwei scheinbar gegensätzliche, aber im Herzen verwandte Welten: die berührende Intimität von Porträts und die ungezähmte Majestät der Tierwelt.</p>
-          <p>Ob bei einem Neugeborenen-Shooting im weichen Nachmittagslicht oder beim Beobachten eines wilden Geparden in der afrikanischen Savanne — mir geht es darum, die echte Verbindung, den ungestellten Moment und den wahren Geist (<em>Geist</em>) der Szene im Rahmen (<em>Frame</em>) zu verewigen.</p>
+          <p class="about__role">
+            <span class="lang-de">Fotograf · Graz, Österreich</span>
+            <span class="lang-en">Photographer · Graz, Austria</span>
+          </p>
+          <p class="lang-de">Fotografie ist für mich weit mehr als nur das Drücken des Auslösers — es ist die Kunst, die echte Essenz eines Augenblicks einzufangen. Was einst als leidenschaftliche Faszination begann, hat sich über die Jahre zu einer tiefen Hingabe entwickelt, die technische Präzision mit feinem Gespür für die ungestellte Emotion verbindet.</p>
+          <p class="lang-en">For me, photography is far more than just pressing the shutter — it is the art of capturing the true essence of a moment. What once began as a passionate fascination has evolved over the years into a deep dedication, combining technical precision with a fine sense for unposed emotion.</p>
+
+          <p class="lang-de">Unter dem Namen <strong>Framegeist</strong> konzentriere ich mich ganz auf zwei scheinbar gegensätzliche, aber im Herzen verwandte Welten: die berührende Intimität von Porträts und die ungezähmte Majestät der Tierwelt.</p>
+          <p class="lang-en">Under the name <strong>Framegeist</strong>, I focus entirely on two seemingly contrasting but deeply connected worlds: the touching intimacy of portraits and the untamed majesty of wildlife.</p>
+
+          <p class="lang-de">Ob bei einem Neugeborenen-Shooting im weichen Nachmittagslicht oder beim Beobachten eines wilden Geparden in der afrikanischen Savanne — mir geht es darum, die echte Verbindung, den ungestellten Moment und den wahren Geist (<em>Geist</em>) der Szene im Rahmen (<em>Frame</em>) zu verewigen.</p>
+          <p class="lang-en">Whether during a newborn shoot in the soft afternoon light or observing a wild cheetah in the African savannah — my goal is to immortalize the true connection, the unposed moment, and the genuine spirit (<em>Geist</em>) of the scene within the frame (<em>Frame</em>).</p>
+          
           <div class="about__stats">
             <div>
-              <div class="about__stat-number">Porträts</div>
-              <div class="about__stat-label">Familie & Nähe</div>
+              <div class="about__stat-number">
+                <span class="lang-de">Porträts</span>
+                <span class="lang-en">Portraits</span>
+              </div>
+              <div class="about__stat-label">
+                <span class="lang-de">Familie & Nähe</span>
+                <span class="lang-en">Family & Warmth</span>
+              </div>
             </div>
             <div>
               <div class="about__stat-number">Wildlife</div>
-              <div class="about__stat-label">Savanne & Alpen</div>
+              <div class="about__stat-label">
+                <span class="lang-de">Savanne & Alpen</span>
+                <span class="lang-en">Savannah & Alps</span>
+              </div>
             </div>
             <div>
               <div class="about__stat-number">Graz</div>
-              <div class="about__stat-label">Basis & On-Location</div>
+              <div class="about__stat-label">
+                <span class="lang-de">Basis & On-Location</span>
+                <span class="lang-en">Base & On-Location</span>
+              </div>
             </div>
           </div>
         </div>
@@ -81,15 +135,25 @@
     <div class="container">
       <div class="section-header reveal">
         <p class="section-label">Portfolio</p>
-        <h2 class="section-title">Ausgewählte <em>Arbeiten</em></h2>
+        <h2 class="section-title lang-de">Ausgewählte <em>Arbeiten</em></h2>
+        <h2 class="section-title lang-en">Selected <em>Works</em></h2>
         <div class="section-divider"></div>
       </div>
 
       <!-- Category Filter -->
       <div class="gallery__filters reveal">
-        <button class="gallery__filter active" data-filter="all">Alle</button>
-        <button class="gallery__filter" data-filter="portrait">Portraits & Momente</button>
-        <button class="gallery__filter" data-filter="wildlife">Wildlife & Natur</button>
+        <button class="gallery__filter active" data-filter="all">
+          <span class="lang-de">Alle</span>
+          <span class="lang-en">All</span>
+        </button>
+        <button class="gallery__filter" data-filter="portrait">
+          <span class="lang-de">Portraits & Momente</span>
+          <span class="lang-en">Portraits & Moments</span>
+        </button>
+        <button class="gallery__filter" data-filter="wildlife">
+          <span class="lang-de">Wildlife & Natur</span>
+          <span class="lang-en">Wildlife & Nature</span>
+        </button>
       </div>
 
       <div class="gallery__grid" id="galleryGrid">
@@ -102,58 +166,98 @@
   <section class="section services" id="services">
     <div class="container">
       <div class="section-header reveal">
-        <p class="section-label">Leistungen</p>
-        <h2 class="section-title">Fokus & <em>Expertise</em></h2>
+        <p class="section-label">
+          <span class="lang-de">Leistungen</span>
+          <span class="lang-en">Services</span>
+        </p>
+        <h2 class="section-title lang-de">Fokus & <em>Expertise</em></h2>
+        <h2 class="section-title lang-en">Focus & <em>Expertise</em></h2>
         <div class="section-divider"></div>
       </div>
       <div class="services__grid">
         <div class="service-card reveal">
           <div class="service-card__main">
             <span class="service-card__icon">🤰</span>
-            <h3 class="service-card__title">Porträt & Familie</h3>
-            <p class="service-card__desc">Natürliche, emotionale Portraits, Babybauch-Shootings und Neugeborenenfotos im weichen, atmosphärischen Licht.</p>
+            <h3 class="service-card__title">
+              <span class="lang-de">Porträt & Familie</span>
+              <span class="lang-en">Portrait & Family</span>
+            </h3>
+            <p class="service-card__desc lang-de">Natürliche, emotionale Portraits, Babybauch-Shootings und Neugeborenenfotos im weichen, atmosphärischen Licht.</p>
+            <p class="service-card__desc lang-en">Natural, emotional portraits, baby bump sessions, and newborn photography in soft, atmospheric light.</p>
           </div>
           <div class="service-card__details">
-            <ul class="service-card__list">
+            <ul class="service-card__list lang-de">
               <li>Neugeborenen- & Schwangerschaftssessions</li>
               <li>Natürliche Home-Storys & Outdoor-Shootings</li>
               <li>Liebevolle Betreuung & entspannte Atmosphäre</li>
               <li>Professionell retuschierte Fotoalben</li>
             </ul>
+            <ul class="service-card__list lang-en">
+              <li>Newborn & pregnancy sessions</li>
+              <li>Natural home stories & outdoor shoots</li>
+              <li>Caring guidance & relaxed atmosphere</li>
+              <li>Professionally retouched photo albums</li>
+            </ul>
           </div>
-          <div class="service-card__toggle-btn">Mehr erfahren <span>↓</span></div>
+          <div class="service-card__toggle-btn">
+            <span class="lang-de">Mehr erfahren <span>↓</span></span>
+            <span class="lang-en">Learn more <span>↓</span></span>
+          </div>
         </div>
         <div class="service-card reveal">
           <div class="service-card__main">
             <span class="service-card__icon">🐆</span>
-            <h3 class="service-card__title">Wildlife & Natur</h3>
-            <p class="service-card__desc">Wilde Tiere in ihrer natürlichen Umgebung sowie atemberaubende Naturaufnahmen, festgehalten mit unendlicher Geduld.</p>
+            <h3 class="service-card__title">
+              <span class="lang-de">Wildlife & Natur</span>
+              <span class="lang-en">Wildlife & Nature</span>
+            </h3>
+            <p class="service-card__desc lang-de">Wilde Tiere in ihrer natürlichen Umgebung sowie atemberaubende Naturaufnahmen, festgehalten mit unendlicher Geduld.</p>
+            <p class="service-card__desc lang-en">Wild animals in their natural habitat and stunning nature shots, captured with infinite patience.</p>
           </div>
           <div class="service-card__details">
-            <ul class="service-card__list">
+            <ul class="service-card__list lang-de">
               <li>Tier- und Expeditionsreportagen</li>
               <li>Bildrechte für Magazine, Sachbücher & Veröffentlichungen</li>
               <li>Fachvorträge & Ausstellungsdrucke</li>
               <li>Naturlandschaften der Alpen und Afrikas</li>
             </ul>
+            <ul class="service-card__list lang-en">
+              <li>Wildlife and expedition features</li>
+              <li>Image licensing for magazines, books & publications</li>
+              <li>Keynotes & exhibition prints</li>
+              <li>Natural landscapes of the Alps and Africa</li>
+            </ul>
           </div>
-          <div class="service-card__toggle-btn">Mehr erfahren <span>↓</span></div>
+          <div class="service-card__toggle-btn">
+            <span class="lang-de">Mehr erfahren <span>↓</span></span>
+            <span class="lang-en">Learn more <span>↓</span></span>
+          </div>
         </div>
         <div class="service-card reveal">
           <div class="service-card__main">
             <span class="service-card__icon">🖼️</span>
             <h3 class="service-card__title">Fine Art Prints</h3>
-            <p class="service-card__desc">Sorgfältige RAW-Entwicklung und erdiger, zeitloser Bildlook — gedruckt auf erlesenen Papieren als langlebige Wandkunst.</p>
+            <p class="service-card__desc lang-de">Sorgfältige RAW-Entwicklung und erdiger, zeitloser Bildlook — gedruckt auf erlesenen Papieren als langlebige Wandkunst.</p>
+            <p class="service-card__desc lang-en">Meticulous RAW development and earthy, timeless grading — printed on exquisite papers as durable wall art.</p>
           </div>
           <div class="service-card__details">
-            <ul class="service-card__list">
+            <ul class="service-card__list lang-de">
               <li>Wandbilder & Kunstdrucke für Wohn- und Geschäftsräume</li>
               <li>Fine-Art Prints auf erlesenen Papieren</li>
               <li>Individueller, warmer & zeitloser Bildlook</li>
               <li>Professionelle Retusche & Kontrastoptimierung</li>
             </ul>
+            <ul class="service-card__list lang-en">
+              <li>Wall art & art prints for residential & business spaces</li>
+              <li>Fine-Art prints on selected premium papers</li>
+              <li>Individual, warm & timeless image style</li>
+              <li>Professional retouching & contrast optimization</li>
+            </ul>
           </div>
-          <div class="service-card__toggle-btn">Mehr erfahren <span>↓</span></div>
+          <div class="service-card__toggle-btn">
+            <span class="lang-de">Mehr erfahren <span>↓</span></span>
+            <span class="lang-en">Learn more <span>↓</span></span>
+          </div>
         </div>
       </div>
     </div>
@@ -165,8 +269,10 @@
       <div class="contact__inner">
         <div class="contact__info reveal">
           <div class="section-label">Kontakt</div>
-          <h2>Lass uns <em>sprechen</em></h2>
-          <p>Du möchtest ein Shooting buchen oder hast Fragen? Ich freue mich auf deine Nachricht — egal ob per E-Mail, Telefon oder über das Kontaktformular.</p>
+          <h2 class="lang-de">Lass uns <em>sprechen</em></h2>
+          <h2 class="lang-en">Let's <em>talk</em></h2>
+          <p class="lang-de">Du möchtest ein Shooting buchen oder hast Fragen? Ich freue mich auf deine Nachricht — egal ob per E-Mail, Telefon oder über das Kontaktformular.</p>
+          <p class="lang-en">Would you like to book a session or have questions? I look forward to your message — via email, phone, or the contact form.</p>
           <ul class="contact__details">
             <li>
               <span class="icon">✉</span>
@@ -178,24 +284,30 @@
             </li>
             <li>
               <span class="icon">📍</span>
-              <span>Graz, Österreich</span>
+              <span>
+                <span class="lang-de">Graz, Österreich</span>
+                <span class="lang-en">Graz, Austria</span>
+              </span>
             </li>
           </ul>
         </div>
         <form class="contact__form reveal" id="contactForm" onsubmit="handleSubmit(event)">
           <div class="form-group">
-            <input type="text" id="name" placeholder="Dein Name" required>
+            <input type="text" id="name" placeholder="Dein Name / Your Name" required>
           </div>
           <div class="form-group">
-            <input type="email" id="email" placeholder="Deine E-Mail" required>
+            <input type="email" id="email" placeholder="Deine E-Mail / Your Email" required>
           </div>
           <div class="form-group">
-            <input type="text" id="subject" placeholder="Betreff">
+            <input type="text" id="subject" placeholder="Betreff / Subject">
           </div>
           <div class="form-group">
-            <textarea id="message" placeholder="Deine Nachricht..." required></textarea>
+            <textarea id="message" placeholder="Deine Nachricht... / Your message..." required></textarea>
           </div>
-          <button type="submit" class="btn btn--filled">Nachricht senden →</button>
+          <button type="submit" class="btn btn--filled">
+            <span class="lang-de">Nachricht senden →</span>
+            <span class="lang-en">Send Message →</span>
+          </button>
         </form>
       </div>
     </div>
@@ -205,7 +317,8 @@
   <footer class="footer">
     <div class="container footer__inner">
       <div class="footer__logo">Frame<span>geist</span></div>
-      <p class="footer__copy">© 2026 Framegeist. Alle Rechte vorbehalten.</p>
+      <p class="footer__copy lang-de">© 2026 Framegeist. Alle Rechte vorbehalten.</p>
+      <p class="footer__copy lang-en">© 2026 Framegeist. All rights reserved.</p>
       <ul class="footer__social">
         <li><a href="https://www.instagram.com" target="_blank" rel="noopener" aria-label="Instagram">📷</a></li>
         <li><a href="mailto:hettegger@student.tugraz.at" aria-label="Email">✉</a></li>
@@ -224,27 +337,27 @@
 
   <!-- ========== JAVASCRIPT ========== -->
   <script>
-    // --- Curated image data with categories ---
+    // --- Curated image data with categories and bilingual captions ---
     const galleryImages = [
       // --- Portraits & Babybauch ---
-      { src: "Babyfotos D&T/1-IMG_6908.jpg", alt: "Zarte Babyhände greifen behutsam nach den Fingern der Eltern", category: "portrait" },
-      { src: "Babyfotos D&T/5-IMG_6934.jpg", alt: "Neugeborenes schläft friedlich eingekuschelt in einer warmen Decke", category: "portrait" },
-      { src: "Babyfotos D&T/14-IMG_6994.jpg", alt: "Liebevolle Mutter wiegt ihr Neugeborenes sanft im Arm", category: "portrait" },
-      { src: "Babyfotos D&T/21-IMG_7054.jpg", alt: "Strahlendes Baby-Lächeln voller Unschuld und reinem Glück", category: "portrait" },
-      { src: "Babyfotos D&T/28-IMG_7145.jpg", alt: "Stolze Eltern blicken voller Liebe auf ihr schlafendes Wunder", category: "portrait" },
-      { src: "Babyfotos D&T/41-IMG_7238.jpg", alt: "Ein friedlicher Moment der Geborgenheit im warmen Nachmittagslicht", category: "portrait" },
-      { src: "Fotos/IMG_4926.JPG", alt: "Innig lächelndes Paar in traditioneller steirischer Tracht", category: "portrait" },
-      { src: "Fotos/IMG_4930.JPG", alt: "Liebevolles Paar in Tracht auf einer weiten Sommerwiese", category: "portrait" },
-      { src: "Fotos/IMG_5571.JPG", alt: "Fröhlich lachendes Brautpaar an ihrem Hochzeitstag", category: "portrait" },
-      { src: "Fotos/IMG_5615.JPG", alt: "Elegantes Hochzeitspaar im prachtvollen Mirabellgarten in Salzburg", category: "portrait" },
-      { src: "Fotos/IMG_5617.jpg", alt: "Romantischer Kuss des Brautpaars vor barocker Kulisse", category: "portrait" },
+      { src: "Babyfotos D&T/1-IMG_6908.jpg", alt: "Zarte Babyhände greifen behutsam nach den Fingern der Eltern", alt_en: "Delicate baby hands gently grasping the parents' fingers", category: "portrait" },
+      { src: "Babyfotos D&T/5-IMG_6934.jpg", alt: "Neugeborenes schläft friedlich eingekuschelt in einer warmen Decke", alt_en: "Newborn sleeping peacefully snuggled in a warm blanket", category: "portrait" },
+      { src: "Babyfotos D&T/14-IMG_6994.jpg", alt: "Liebevolle Mutter wiegt ihr Neugeborenes sanft im Arm", alt_en: "Loving mother gently cradling her newborn in her arms", category: "portrait" },
+      { src: "Babyfotos D&T/21-IMG_7054.jpg", alt: "Strahlendes Baby-Lächeln voller Unschuld und reinem Glück", alt_en: "Beaming baby smile full of innocence and pure happiness", category: "portrait" },
+      { src: "Babyfotos D&T/28-IMG_7145.jpg", alt: "Stolze Eltern blicken voller Liebe auf ihr schlafendes Wunder", alt_en: "Proud parents looking full of love at their sleeping miracle", category: "portrait" },
+      { src: "Babyfotos D&T/41-IMG_7238.jpg", alt: "Ein friedlicher Moment der Geborgenheit im warmen Nachmittagslicht", alt_en: "A peaceful moment of security in the warm afternoon light", category: "portrait" },
+      { src: "Fotos/IMG_4926.JPG", alt: "Innig lächelndes Paar in traditioneller steirischer Tracht", alt_en: "Intimately smiling couple in traditional Styrian clothing", category: "portrait" },
+      { src: "Fotos/IMG_4930.JPG", alt: "Liebevolles Paar in Tracht auf einer weiten Sommerwiese", alt_en: "Loving couple in traditional clothing on a wide summer meadow", category: "portrait" },
+      { src: "Fotos/IMG_5571.JPG", alt: "Fröhlich lachendes Brautpaar an ihrem Hochzeitstag", alt_en: "Joyfully laughing wedding couple on their wedding day", category: "portrait" },
+      { src: "Fotos/IMG_5615.JPG", alt: "Elegantes Hochzeitspaar im prachtvollen Mirabellgarten in Salzburg", alt_en: "Elegant wedding couple in the magnificent Mirabell Gardens in Salzburg", category: "portrait" },
+      { src: "Fotos/IMG_5617.jpg", alt: "Romantischer Kuss des Brautpaars vor barocker Kulisse", alt_en: "Romantic kiss of the wedding couple in front of a baroque backdrop", category: "portrait" },
 
       // --- Wildlife & Natur ---
-      { src: "Fotos/IMG_6587.JPG", alt: "Anmutiger Gepard im Porträt vor sanftem grünem Hintergrund", category: "wildlife" },
-      { src: "Fotos/IMG_5752.JPG", alt: "Eine Herde Zebras in der weiten afrikanischen Savanne", category: "wildlife" },
-      { src: "Fotos/IMG_5974.JPG", alt: "Glänzender Rotschwingenstar mit leuchtenden Augen im warmen Licht", category: "wildlife" },
-      { src: "Fotos/IMG_6099.JPG", alt: "Majestätischer Springbock ruht friedlich in der Savanne", category: "wildlife" },
-      { src: "Fotos/IMG_6208.JPG", alt: "Niedliches Hörnchen knabbert aufmerksam an einem Leckerbissen", category: "wildlife" }
+      { src: "Fotos/IMG_6587.JPG", alt: "Anmutiger Gepard im Porträt vor sanftem grünem Hintergrund", alt_en: "Graceful cheetah portrait against a soft green background", category: "wildlife" },
+      { src: "Fotos/IMG_5752.JPG", alt: "Eine Herde Zebras in der weiten afrikanischen Savanne", alt_en: "A herd of zebras in the wide African savannah", category: "wildlife" },
+      { src: "Fotos/IMG_5974.JPG", alt: "Glänzender Rotschwingenstar mit leuchtenden Augen im warmen Licht", alt_en: "Glossy red-winged starling with glowing eyes in warm light", category: "wildlife" },
+      { src: "Fotos/IMG_6099.JPG", alt: "Majestätischer Springbock ruht friedlich in der Savanne", alt_en: "Majestic springbok resting peacefully in the savannah", category: "wildlife" },
+      { src: "Fotos/IMG_6208.JPG", alt: "Niedliches Hörnchen knabbert aufmerksam an einem Leckerbissen", alt_en: "Cute squirrel nibbling attentively on a treat", category: "wildlife" }
     ];
 
     // --- Current filter state ---
@@ -260,14 +373,17 @@
         ? [...galleryImages]
         : galleryImages.filter(img => img.category === filter);
 
+      const isEn = document.body.classList.contains('lang-en');
+
       filteredImages.forEach((img, i) => {
         const item = document.createElement('div');
         item.className = 'gallery__item reveal';
         item.setAttribute('data-category', img.category);
+        const captionText = isEn ? img.alt_en : img.alt;
         item.innerHTML = `
-          <img src="${img.src}" alt="${img.alt}" loading="lazy">
+          <img src="${img.src}" alt="${captionText}" loading="lazy">
           <div class="gallery__item-overlay">
-            <div class="gallery__item-caption">${img.alt}</div>
+            <div class="gallery__item-caption">${captionText}</div>
             <div class="gallery__view-icon">⤢</div>
           </div>
         `;
@@ -299,6 +415,34 @@
       });
     });
 
+    // --- Language Switcher Controller ---
+    const langBtns = document.querySelectorAll('.lang-btn');
+    langBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const lang = btn.getAttribute('data-lang');
+        document.body.className = document.body.className.replace(/\blang-\w+\b/g, '');
+        document.body.classList.add(`lang-${lang}`);
+        document.documentElement.className = `lang-${lang}`;
+        langBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        localStorage.setItem('preferredLang', lang);
+        
+        // Re-render gallery with new language
+        renderGallery(activeFilter);
+      });
+    });
+
+    // Load preferred language
+    const currentLang = localStorage.getItem('preferredLang') || 'de';
+    document.body.className = document.body.className.replace(/\blang-\w+\b/g, '');
+    document.body.classList.add(`lang-${currentLang}`);
+    document.documentElement.className = `lang-${currentLang}`;
+    const activeBtn = document.querySelector(`.lang-btn[data-lang="${currentLang}"]`);
+    if (activeBtn) {
+      langBtns.forEach(b => b.classList.remove('active'));
+      activeBtn.classList.add('active');
+    }
+
     // --- Navigation scroll effect ---
     const nav = document.getElementById('nav');
     window.addEventListener('scroll', () => {
@@ -323,8 +467,9 @@
 
     function openLightbox(index) {
       currentIndex = index;
+      const isEn = document.body.classList.contains('lang-en');
       lightboxImg.src = filteredImages[currentIndex].src;
-      lightboxCaption.textContent = filteredImages[currentIndex].alt;
+      lightboxCaption.textContent = isEn ? filteredImages[currentIndex].alt_en : filteredImages[currentIndex].alt;
       lightbox.classList.add('active');
       document.body.style.overflow = 'hidden';
     }
@@ -341,16 +486,18 @@
 
     document.getElementById('lightboxPrev').addEventListener('click', (e) => {
       e.stopPropagation();
+      const isEn = document.body.classList.contains('lang-en');
       currentIndex = (currentIndex - 1 + filteredImages.length) % filteredImages.length;
       lightboxImg.src = filteredImages[currentIndex].src;
-      lightboxCaption.textContent = filteredImages[currentIndex].alt;
+      lightboxCaption.textContent = isEn ? filteredImages[currentIndex].alt_en : filteredImages[currentIndex].alt;
     });
 
     document.getElementById('lightboxNext').addEventListener('click', (e) => {
       e.stopPropagation();
+      const isEn = document.body.classList.contains('lang-en');
       currentIndex = (currentIndex + 1) % filteredImages.length;
       lightboxImg.src = filteredImages[currentIndex].src;
-      lightboxCaption.textContent = filteredImages[currentIndex].alt;
+      lightboxCaption.textContent = isEn ? filteredImages[currentIndex].alt_en : filteredImages[currentIndex].alt;
     });
 
     document.addEventListener('keydown', (e) => {
