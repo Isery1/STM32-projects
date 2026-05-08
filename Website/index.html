@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Framegeist — Porträt- & Wildlife-Fotografie</title>
+  <meta name="description" content="Framegeist — Professionelle Porträt- und Wildlife-Fotografie aus Graz. Intime Portraits, berührende Neugeborenenfotos und majestätische Tieraufnahmen.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ========== NAVIGATION ========== -->
+  <nav class="nav" id="nav">
+    <div class="container nav__inner">
+      <a href="#" class="nav__logo">Frame<span>geist</span></a>
+      <ul class="nav__links" id="navLinks">
+        <li><a href="#home">Home</a></li>
+        <li><a href="#about">Über mich</a></li>
+        <li><a href="#gallery">Portfolio</a></li>
+        <li><a href="#services">Leistungen</a></li>
+        <li><a href="#contact">Kontakt</a></li>
+      </ul>
+      <button class="nav__toggle" id="navToggle" aria-label="Menü">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ========== HERO ========== -->
+  <section class="hero" id="home">
+    <div class="hero__bg">
+      <img src="Fotos/IMG_6035.JPG" alt="Afrikanischer Sonnenuntergang — Namibia">
+    </div>
+    <div class="hero__overlay"></div>
+    <div class="hero__content">
+      <p class="hero__tagline">Die Essenz des Augenblicks</p>
+      <h1 class="hero__title">Momente<br><em>festhalten</em></h1>
+      <p class="hero__subtitle">Die Seele des Augenblicks eingefangen — von der wilden Majestät der Natur bis zur intimen Tiefe des menschlichen Portraits.</p>
+      <a href="#gallery" class="hero__scroll">
+        <span>Entdecken</span>
+        <span class="hero__scroll-line"></span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ========== ABOUT ========== -->
+  <section class="section about" id="about">
+    <div class="container">
+      <div class="about__grid">
+        <div class="about__image-wrapper reveal">
+          <img class="about__image" src="Babyfotos D&T/28-IMG_7145.jpg" alt="Framegeist — Fotografie">
+        </div>
+        <div class="about__text reveal">
+          <div class="section-label">Über mich</div>
+          <h2>Frame<em>geist</em></h2>
+          <p class="about__role">Fotograf · Graz, Österreich</p>
+          <p>Fotografie ist für mich weit mehr als nur das Drücken des Auslösers — es ist die Kunst, die echte Essenz eines Augenblicks einzufangen. Was einst als leidenschaftliche Faszination begann, hat sich über die Jahre zu einer tiefen Hingabe entwickelt, die technische Präzision mit feinem Gespür für die ungestellte Emotion verbindet.</p>
+          <p>Unter dem Namen <strong>Framegeist</strong> konzentriere ich mich ganz auf zwei scheinbar gegensätzliche, aber im Herzen verwandte Welten: die berührende Intimität von Porträts und die ungezähmte Majestät der Tierwelt.</p>
+          <p>Ob bei einem Neugeborenen-Shooting im weichen Nachmittagslicht oder beim Beobachten eines wilden Geparden in der afrikanischen Savanne — mir geht es darum, die echte Verbindung, den ungestellten Moment und den wahren Geist (<em>Geist</em>) der Szene im Rahmen (<em>Frame</em>) zu verewigen.</p>
+          <div class="about__stats">
+            <div>
+              <div class="about__stat-number">Porträts</div>
+              <div class="about__stat-label">Familie & Nähe</div>
+            </div>
+            <div>
+              <div class="about__stat-number">Wildlife</div>
+              <div class="about__stat-label">Savanne & Alpen</div>
+            </div>
+            <div>
+              <div class="about__stat-number">Graz</div>
+              <div class="about__stat-label">Basis & On-Location</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== GALLERY ========== -->
+  <section class="section gallery" id="gallery">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">Portfolio</p>
+        <h2 class="section-title">Ausgewählte <em>Arbeiten</em></h2>
+        <div class="section-divider"></div>
+      </div>
+
+      <!-- Category Filter -->
+      <div class="gallery__filters reveal">
+        <button class="gallery__filter active" data-filter="all">Alle</button>
+        <button class="gallery__filter" data-filter="portrait">Portraits & Momente</button>
+        <button class="gallery__filter" data-filter="wildlife">Wildlife & Natur</button>
+      </div>
+
+      <div class="gallery__grid" id="galleryGrid">
+        <!-- Images populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== SERVICES ========== -->
+  <section class="section services" id="services">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">Leistungen</p>
+        <h2 class="section-title">Fokus & <em>Expertise</em></h2>
+        <div class="section-divider"></div>
+      </div>
+      <div class="services__grid">
+        <div class="service-card reveal">
+          <div class="service-card__main">
+            <span class="service-card__icon">🤰</span>
+            <h3 class="service-card__title">Porträt & Familie</h3>
+            <p class="service-card__desc">Natürliche, emotionale Portraits, Babybauch-Shootings und Neugeborenenfotos im weichen, atmosphärischen Licht.</p>
+          </div>
+          <div class="service-card__details">
+            <ul class="service-card__list">
+              <li>Neugeborenen- & Schwangerschaftssessions</li>
+              <li>Natürliche Home-Storys & Outdoor-Shootings</li>
+              <li>Liebevolle Betreuung & entspannte Atmosphäre</li>
+              <li>Professionell retuschierte Fotoalben</li>
+            </ul>
+          </div>
+          <div class="service-card__toggle-btn">Mehr erfahren <span>↓</span></div>
+        </div>
+        <div class="service-card reveal">
+          <div class="service-card__main">
+            <span class="service-card__icon">🐆</span>
+            <h3 class="service-card__title">Wildlife & Natur</h3>
+            <p class="service-card__desc">Wilde Tiere in ihrer natürlichen Umgebung sowie atemberaubende Naturaufnahmen, festgehalten mit unendlicher Geduld.</p>
+          </div>
+          <div class="service-card__details">
+            <ul class="service-card__list">
+              <li>Tier- und Expeditionsreportagen</li>
+              <li>Bildrechte für Magazine, Sachbücher & Veröffentlichungen</li>
+              <li>Fachvorträge & Ausstellungsdrucke</li>
+              <li>Naturlandschaften der Alpen und Afrikas</li>
+            </ul>
+          </div>
+          <div class="service-card__toggle-btn">Mehr erfahren <span>↓</span></div>
+        </div>
+        <div class="service-card reveal">
+          <div class="service-card__main">
+            <span class="service-card__icon">🖼️</span>
+            <h3 class="service-card__title">Fine Art Prints</h3>
+            <p class="service-card__desc">Sorgfältige RAW-Entwicklung und erdiger, zeitloser Bildlook — gedruckt auf erlesenen Papieren als langlebige Wandkunst.</p>
+          </div>
+          <div class="service-card__details">
+            <ul class="service-card__list">
+              <li>Wandbilder & Kunstdrucke für Wohn- und Geschäftsräume</li>
+              <li>Fine-Art Prints auf erlesenen Papieren</li>
+              <li>Individueller, warmer & zeitloser Bildlook</li>
+              <li>Professionelle Retusche & Kontrastoptimierung</li>
+            </ul>
+          </div>
+          <div class="service-card__toggle-btn">Mehr erfahren <span>↓</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== CONTACT ========== -->
+  <section class="section contact" id="contact">
+    <div class="container">
+      <div class="contact__inner">
+        <div class="contact__info reveal">
+          <div class="section-label">Kontakt</div>
+          <h2>Lass uns <em>sprechen</em></h2>
+          <p>Du möchtest ein Shooting buchen oder hast Fragen? Ich freue mich auf deine Nachricht — egal ob per E-Mail, Telefon oder über das Kontaktformular.</p>
+          <ul class="contact__details">
+            <li>
+              <span class="icon">✉</span>
+              <a href="mailto:hettegger@student.tugraz.at">hettegger@student.tugraz.at</a>
+            </li>
+            <li>
+              <span class="icon">📱</span>
+              <a href="tel:+436642184456">+43 664 2184456</a>
+            </li>
+            <li>
+              <span class="icon">📍</span>
+              <span>Graz, Österreich</span>
+            </li>
+          </ul>
+        </div>
+        <form class="contact__form reveal" id="contactForm" onsubmit="handleSubmit(event)">
+          <div class="form-group">
+            <input type="text" id="name" placeholder="Dein Name" required>
+          </div>
+          <div class="form-group">
+            <input type="email" id="email" placeholder="Deine E-Mail" required>
+          </div>
+          <div class="form-group">
+            <input type="text" id="subject" placeholder="Betreff">
+          </div>
+          <div class="form-group">
+            <textarea id="message" placeholder="Deine Nachricht..." required></textarea>
+          </div>
+          <button type="submit" class="btn btn--filled">Nachricht senden →</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== FOOTER ========== -->
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__logo">Frame<span>geist</span></div>
+      <p class="footer__copy">© 2026 Framegeist. Alle Rechte vorbehalten.</p>
+      <ul class="footer__social">
+        <li><a href="https://www.instagram.com" target="_blank" rel="noopener" aria-label="Instagram">📷</a></li>
+        <li><a href="mailto:hettegger@student.tugraz.at" aria-label="Email">✉</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <!-- ========== LIGHTBOX ========== -->
+  <div class="lightbox" id="lightbox">
+    <button class="lightbox__close" id="lightboxClose" aria-label="Schließen">✕</button>
+    <button class="lightbox__nav lightbox__prev" id="lightboxPrev" aria-label="Vorheriges Bild">‹</button>
+    <img class="lightbox__img" id="lightboxImg" src="" alt="Vergrößerte Ansicht">
+    <button class="lightbox__nav lightbox__next" id="lightboxNext" aria-label="Nächstes Bild">›</button>
+    <div class="lightbox__caption" id="lightboxCaption"></div>
+  </div>
+
+  <!-- ========== JAVASCRIPT ========== -->
+  <script>
+    // --- Curated image data with categories ---
+    const galleryImages = [
+      // --- Portraits & Babybauch ---
+      { src: "Babyfotos D&T/1-IMG_6908.jpg", alt: "Zarte Babyhände greifen behutsam nach den Fingern der Eltern", category: "portrait" },
+      { src: "Babyfotos D&T/5-IMG_6934.jpg", alt: "Neugeborenes schläft friedlich eingekuschelt in einer warmen Decke", category: "portrait" },
+      { src: "Babyfotos D&T/14-IMG_6994.jpg", alt: "Liebevolle Mutter wiegt ihr Neugeborenes sanft im Arm", category: "portrait" },
+      { src: "Babyfotos D&T/21-IMG_7054.jpg", alt: "Strahlendes Baby-Lächeln voller Unschuld und reinem Glück", category: "portrait" },
+      { src: "Babyfotos D&T/28-IMG_7145.jpg", alt: "Stolze Eltern blicken voller Liebe auf ihr schlafendes Wunder", category: "portrait" },
+      { src: "Babyfotos D&T/41-IMG_7238.jpg", alt: "Ein friedlicher Moment der Geborgenheit im warmen Nachmittagslicht", category: "portrait" },
+      { src: "Fotos/IMG_4926.JPG", alt: "Innig lächelndes Paar in traditioneller steirischer Tracht", category: "portrait" },
+      { src: "Fotos/IMG_4930.JPG", alt: "Liebevolles Paar in Tracht auf einer weiten Sommerwiese", category: "portrait" },
+      { src: "Fotos/IMG_5571.JPG", alt: "Fröhlich lachendes Brautpaar an ihrem Hochzeitstag", category: "portrait" },
+      { src: "Fotos/IMG_5615.JPG", alt: "Elegantes Hochzeitspaar im prachtvollen Mirabellgarten in Salzburg", category: "portrait" },
+      { src: "Fotos/IMG_5617.jpg", alt: "Romantischer Kuss des Brautpaars vor barocker Kulisse", category: "portrait" },
+
+      // --- Wildlife & Natur ---
+      { src: "Fotos/IMG_6587.JPG", alt: "Anmutiger Gepard im Porträt vor sanftem grünem Hintergrund", category: "wildlife" },
+      { src: "Fotos/IMG_5752.JPG", alt: "Eine Herde Zebras in der weiten afrikanischen Savanne", category: "wildlife" },
+      { src: "Fotos/IMG_5974.JPG", alt: "Glänzender Rotschwingenstar mit leuchtenden Augen im warmen Licht", category: "wildlife" },
+      { src: "Fotos/IMG_6099.JPG", alt: "Majestätischer Springbock ruht friedlich in der Savanne", category: "wildlife" },
+      { src: "Fotos/IMG_6208.JPG", alt: "Niedliches Hörnchen knabbert aufmerksam an einem Leckerbissen", category: "wildlife" }
+    ];
+
+    // --- Current filter state ---
+    let activeFilter = 'all';
+    let filteredImages = [...galleryImages];
+
+    // --- Populate gallery ---
+    function renderGallery(filter) {
+      const grid = document.getElementById('galleryGrid');
+      grid.innerHTML = '';
+
+      filteredImages = filter === 'all'
+        ? [...galleryImages]
+        : galleryImages.filter(img => img.category === filter);
+
+      filteredImages.forEach((img, i) => {
+        const item = document.createElement('div');
+        item.className = 'gallery__item reveal';
+        item.setAttribute('data-category', img.category);
+        item.innerHTML = `
+          <img src="${img.src}" alt="${img.alt}" loading="lazy">
+          <div class="gallery__item-overlay">
+            <div class="gallery__item-caption">${img.alt}</div>
+            <div class="gallery__view-icon">⤢</div>
+          </div>
+        `;
+        item.addEventListener('click', () => openLightbox(i));
+        grid.appendChild(item);
+      });
+
+      // Re-trigger reveal animations
+      document.querySelectorAll('.gallery__item.reveal').forEach(el => observer.observe(el));
+
+      // Trigger visible immediately for items in view
+      setTimeout(() => {
+        document.querySelectorAll('.gallery__item.reveal').forEach(el => {
+          const rect = el.getBoundingClientRect();
+          if (rect.top < window.innerHeight) {
+            el.classList.add('visible');
+          }
+        });
+      }, 50);
+    }
+
+    // --- Filter buttons ---
+    document.querySelectorAll('.gallery__filter').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.gallery__filter').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeFilter = btn.dataset.filter;
+        renderGallery(activeFilter);
+      });
+    });
+
+    // --- Navigation scroll effect ---
+    const nav = document.getElementById('nav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 60);
+    });
+
+    // --- Mobile menu ---
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.getElementById('navLinks');
+    navToggle.addEventListener('click', () => {
+      navLinks.classList.toggle('open');
+    });
+    navLinks.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => navLinks.classList.remove('open'));
+    });
+
+    // --- Lightbox ---
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightboxImg');
+    const lightboxCaption = document.getElementById('lightboxCaption');
+    let currentIndex = 0;
+
+    function openLightbox(index) {
+      currentIndex = index;
+      lightboxImg.src = filteredImages[currentIndex].src;
+      lightboxCaption.textContent = filteredImages[currentIndex].alt;
+      lightbox.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      lightbox.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox) closeLightbox();
+    });
+
+    document.getElementById('lightboxPrev').addEventListener('click', (e) => {
+      e.stopPropagation();
+      currentIndex = (currentIndex - 1 + filteredImages.length) % filteredImages.length;
+      lightboxImg.src = filteredImages[currentIndex].src;
+      lightboxCaption.textContent = filteredImages[currentIndex].alt;
+    });
+
+    document.getElementById('lightboxNext').addEventListener('click', (e) => {
+      e.stopPropagation();
+      currentIndex = (currentIndex + 1) % filteredImages.length;
+      lightboxImg.src = filteredImages[currentIndex].src;
+      lightboxCaption.textContent = filteredImages[currentIndex].alt;
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!lightbox.classList.contains('active')) return;
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowLeft') document.getElementById('lightboxPrev').click();
+      if (e.key === 'ArrowRight') document.getElementById('lightboxNext').click();
+    });
+
+    // --- Scroll reveal ---
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    // --- Contact form ---
+    function handleSubmit(e) {
+      e.preventDefault();
+      const name = document.getElementById('name').value;
+      const email = document.getElementById('email').value;
+      const subject = document.getElementById('subject').value;
+      const message = document.getElementById('message').value;
+      const mailto = `mailto:hettegger@student.tugraz.at?subject=${encodeURIComponent(subject || 'Anfrage von ' + name)}&body=${encodeURIComponent('Von: ' + name + '\nE-Mail: ' + email + '\n\n' + message)}`;
+      window.location.href = mailto;
+    }
+
+    // --- Smooth scroll for anchor links ---
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+
+    // --- Toggle Service Cards ---
+    document.querySelectorAll('.service-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const wasExpanded = card.classList.contains('expanded');
+        document.querySelectorAll('.service-card').forEach(c => c.classList.remove('expanded'));
+        if (!wasExpanded) {
+          card.classList.add('expanded');
+        }
+      });
+    });
+
+    // --- Initial render ---
+    renderGallery('all');
+  </script>
+
+</body>
+</html>
