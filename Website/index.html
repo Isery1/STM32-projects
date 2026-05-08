@@ -110,31 +110,9 @@
           <p class="lang-de">Ob im Wohnzimmer mit einer jungen Familie oder irgendwo in der Savanne: Mir geht es immer um den echten, ungestellten Moment. Den Geist (<em>Geist</em>) im Bild (<em>Frame</em>).</p>
           <p class="lang-en">Whether in a living room with a young family or somewhere out in the savannah, it's always about the real, unposed moment. The spirit (<em>Geist</em>) within the frame (<em>Frame</em>).</p>
           
-          <div class="about__stats">
-            <div>
-              <div class="about__stat-number">
-                <span class="lang-de">Porträts</span>
-                <span class="lang-en">Portraits</span>
-              </div>
-              <div class="about__stat-label">
-                <span class="lang-de">Familie & Nähe</span>
-                <span class="lang-en">Family & Warmth</span>
-              </div>
-            </div>
-            <div>
-              <div class="about__stat-number">Wildlife</div>
-              <div class="about__stat-label">
-                <span class="lang-de">Savanne & Alpen</span>
-                <span class="lang-en">Savannah & Alps</span>
-              </div>
-            </div>
-            <div>
-              <div class="about__stat-number">Graz</div>
-              <div class="about__stat-label">
-                <span class="lang-de">Basis & On-Location</span>
-                <span class="lang-en">Base & On-Location</span>
-              </div>
-            </div>
+          <div class="about__quote">
+            <p class="about__quote-text lang-de">"Ein gutes Foto ist das Ergebnis von Geduld, Vertrauen und dem richtigen Augenblick."</p>
+            <p class="about__quote-text lang-en">"A great photograph is the result of patience, trust, and the perfect moment."</p>
           </div>
         </div>
       </div>
@@ -188,7 +166,6 @@
       <div class="services__grid">
         <div class="service-card reveal">
           <div class="service-card__main">
-            <span class="service-card__icon">I</span>
             <h3 class="service-card__title">
               <span class="lang-de">Porträt & Familie</span>
               <span class="lang-en">Portrait & Family</span>
@@ -217,7 +194,6 @@
         </div>
         <div class="service-card reveal">
           <div class="service-card__main">
-            <span class="service-card__icon">II</span>
             <h3 class="service-card__title">
               <span class="lang-de">Wildlife & Natur</span>
               <span class="lang-en">Wildlife & Nature</span>
@@ -246,7 +222,6 @@
         </div>
         <div class="service-card reveal">
           <div class="service-card__main">
-            <span class="service-card__icon">III</span>
             <h3 class="service-card__title">Fine Art Prints</h3>
             <p class="service-card__desc lang-de">Sorgfältige RAW-Entwicklung und ein warmer, zeitloser Bildlook. Gedruckt auf hochwertigen Papieren als Wandkunst.</p>
             <p class="service-card__desc lang-en">Careful RAW development and a warm, timeless look. Printed on premium papers as lasting wall art.</p>
@@ -411,38 +386,97 @@
 
     // --- Current filter state ---
     let activeFilter = 'all';
-    let filteredImages = [...galleryImages];
+    let filteredPool = []; // All matching images for the active filter
+    let visibleImages = []; // The 8 currently visible images
+    let cycleInterval = null;
+
+    // Helper to shuffle an array
+    function shuffleArray(array) {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
 
     // --- Populate gallery ---
     function renderGallery(filter) {
       const grid = document.getElementById('galleryGrid');
       grid.innerHTML = '';
+      
+      // Stop any existing cycle interval
+      if (cycleInterval) clearInterval(cycleInterval);
 
-      filteredImages = filter === 'all'
+      // Get all images matching the selected category filter
+      filteredPool = filter === 'all'
         ? [...galleryImages]
         : galleryImages.filter(img => img.category === filter);
 
-      filteredImages.forEach((img, i) => {
+      // Shuffle and pick the first 8 images (or fewer if the pool is smaller)
+      const shuffled = shuffleArray(filteredPool);
+      visibleImages = shuffled.slice(0, Math.min(8, shuffled.length));
+
+      // Render the visible images
+      visibleImages.forEach((img, i) => {
         const item = document.createElement('div');
-        item.className = 'gallery__item reveal';
-        item.setAttribute('data-category', img.category);
+        item.className = 'gallery__item';
+        item.style.opacity = '1';
+        item.setAttribute('data-index', i);
         item.innerHTML = `<img src="${img.src}" alt="Framegeist" loading="lazy">`;
-        item.addEventListener('click', () => openLightbox(i));
+        
+        // When clicked, open lightbox for this image's src
+        item.addEventListener('click', () => openLightbox(img.src));
         grid.appendChild(item);
       });
 
-      // Re-trigger reveal animations
-      document.querySelectorAll('.gallery__item.reveal').forEach(el => observer.observe(el));
+      // Start the dynamic swap cycle only if there are more images in the pool than visible
+      if (filteredPool.length > visibleImages.length) {
+        cycleInterval = setInterval(swapRandomImage, 3500);
+      }
+    }
 
-      // Trigger visible immediately for items in view
+    function swapRandomImage() {
+      const gridItems = document.querySelectorAll('#galleryGrid .gallery__item');
+      if (gridItems.length === 0) return;
+
+      // Pick a random grid slot to replace (0 to 7)
+      const slotIndex = Math.floor(Math.random() * gridItems.length);
+      const targetItem = gridItems[slotIndex];
+
+      // Find images in the filteredPool that are NOT currently displayed
+      const currentSrcs = visibleImages.map(img => img.src);
+      const unusedPool = filteredPool.filter(img => !currentSrcs.includes(img.src));
+
+      if (unusedPool.length === 0) return;
+
+      // Pick a random new image from the unused pool
+      const newImage = unusedPool[Math.floor(Math.random() * unusedPool.length)];
+
+      // 1. Fade out the target slot
+      targetItem.style.opacity = '0';
+
+      // 2. Wait for the fade-out to complete (800ms) before swapping
       setTimeout(() => {
-        document.querySelectorAll('.gallery__item.reveal').forEach(el => {
-          const rect = el.getBoundingClientRect();
-          if (rect.top < window.innerHeight) {
-            el.classList.add('visible');
-          }
-        });
-      }, 50);
+        // Swap image src
+        const imgElement = targetItem.querySelector('img');
+        if (imgElement) {
+          imgElement.src = newImage.src;
+        }
+
+        // Update the visible list tracker
+        visibleImages[slotIndex] = newImage;
+
+        // Update click event for the new image src
+        const newItem = targetItem.cloneNode(true);
+        newItem.addEventListener('click', () => openLightbox(newImage.src));
+        targetItem.replaceWith(newItem);
+
+        // 3. Fade back in
+        setTimeout(() => {
+          newItem.style.opacity = '1';
+        }, 50);
+      }, 800);
     }
 
     // --- Filter buttons ---
@@ -501,9 +535,11 @@
     const lightboxImg = document.getElementById('lightboxImg');
     let currentIndex = 0;
 
-    function openLightbox(index) {
-      currentIndex = index;
-      lightboxImg.src = filteredImages[currentIndex].src;
+    function openLightbox(src) {
+      currentIndex = filteredPool.findIndex(img => img.src === src);
+      if (currentIndex === -1) currentIndex = 0;
+
+      lightboxImg.src = filteredPool[currentIndex].src;
       lightbox.classList.add('active');
       document.body.style.overflow = 'hidden';
     }
@@ -520,14 +556,14 @@
 
     document.getElementById('lightboxPrev').addEventListener('click', (e) => {
       e.stopPropagation();
-      currentIndex = (currentIndex - 1 + filteredImages.length) % filteredImages.length;
-      lightboxImg.src = filteredImages[currentIndex].src;
+      currentIndex = (currentIndex - 1 + filteredPool.length) % filteredPool.length;
+      lightboxImg.src = filteredPool[currentIndex].src;
     });
 
     document.getElementById('lightboxNext').addEventListener('click', (e) => {
       e.stopPropagation();
-      currentIndex = (currentIndex + 1) % filteredImages.length;
-      lightboxImg.src = filteredImages[currentIndex].src;
+      currentIndex = (currentIndex + 1) % filteredPool.length;
+      lightboxImg.src = filteredPool[currentIndex].src;
     });
 
     document.addEventListener('keydown', (e) => {

@@ -414,27 +414,20 @@ a:hover { color: var(--clr-gold-light); }
   line-height: 1.8;
 }
 
-.about__stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-sm);
+.about__quote {
   margin-top: var(--space-md);
   padding-top: var(--space-md);
   border-top: 1px solid rgba(201, 168, 108, 0.12);
 }
 
-.about__stat-number {
+.about__quote-text {
   font-family: var(--ff-heading);
-  font-size: var(--fs-h2);
-  color: var(--clr-gold);
+  font-size: var(--fs-h3);
+  font-style: italic;
   font-weight: 300;
-}
-
-.about__stat-label {
-  font-size: var(--fs-xs);
-  color: var(--clr-text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  line-height: 1.5;
+  color: var(--clr-gold);
+  letter-spacing: 0.02em;
 }
 
 /* --- Gallery Section --- */
@@ -488,6 +481,7 @@ a:hover { color: var(--clr-gold-light); }
   overflow: hidden;
   cursor: pointer;
   border-radius: var(--radius);
+  transition: opacity 0.8s ease-in-out, transform 0.5s ease;
 }
 
 .gallery__item img {
