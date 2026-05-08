@@ -519,14 +519,50 @@
     document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 
     // --- Contact form ---
-    function handleSubmit(e) {
+    async function handleSubmit(e) {
       e.preventDefault();
-      const name = document.getElementById('name').value;
-      const email = document.getElementById('email').value;
-      const subject = document.getElementById('subject').value;
-      const message = document.getElementById('message').value;
-      const mailto = `mailto:kontakt@framegeist.at?subject=${encodeURIComponent(subject || 'Anfrage von ' + name)}&body=${encodeURIComponent('Von: ' + name + '\nE-Mail: ' + email + '\n\n' + message)}`;
-      window.location.href = mailto;
+      const form = e.target;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const origBtnText = submitBtn.innerHTML;
+      
+      const isEn = document.body.classList.contains('lang-en');
+      submitBtn.innerHTML = isEn ? 'Sending...' : 'Senden...';
+      submitBtn.disabled = true;
+
+      const formData = new FormData();
+      formData.append('name', document.getElementById('name').value);
+      formData.append('email', document.getElementById('email').value);
+      formData.append('subject', document.getElementById('subject').value);
+      formData.append('message', document.getElementById('message').value);
+
+      try {
+        const response = await fetch('contact.php', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (response.ok) {
+          submitBtn.innerHTML = isEn ? 'Message Sent! ✓' : 'Nachricht gesendet! ✓';
+          form.reset();
+          setTimeout(() => {
+            submitBtn.innerHTML = origBtnText;
+            submitBtn.disabled = false;
+          }, 4000);
+        } else {
+          throw new Error('Server error');
+        }
+      } catch (error) {
+        // Fallback to mailto link if PHP script fails
+        const name = document.getElementById('name').value;
+        const email = document.getElementById('email').value;
+        const subject = document.getElementById('subject').value;
+        const message = document.getElementById('message').value;
+        const mailto = `mailto:kontakt@framegeist.at?subject=${encodeURIComponent(subject || 'Anfrage von ' + name)}&body=${encodeURIComponent('Von: ' + name + '\nE-Mail: ' + email + '\n\n' + message)}`;
+        window.location.href = mailto;
+        
+        submitBtn.innerHTML = origBtnText;
+        submitBtn.disabled = false;
+      }
     }
 
     // --- Smooth scroll for anchor links ---
