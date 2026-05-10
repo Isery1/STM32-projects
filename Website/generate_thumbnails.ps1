@@ -4,7 +4,7 @@ function Resize-Image {
     param (
         [string]$SourcePath,
         [string]$TargetPath,
-        [int]$MaxWidth = 500
+        [int]$MaxWidth = 1200
     )
     try {
         $image = [System.Drawing.Image]::FromFile($SourcePath)
@@ -31,14 +31,14 @@ function Resize-Image {
         # JPEG Encoder
         $encoder = [System.Drawing.Imaging.ImageCodecInfo]::GetImageDecoders() | Where-Object { $_.FormatID -eq [System.Drawing.Imaging.ImageFormat]::Jpeg.Guid }
         $encoderParams = New-Object System.Drawing.Imaging.EncoderParameters(1)
-        $encoderParams.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter([System.Drawing.Imaging.Encoder]::Quality, 80) # 80% quality is perfect for web previews
+        $encoderParams.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter([System.Drawing.Imaging.Encoder]::Quality, 90) # 90% quality is perfect for professional web previews
         
         $bitmap.Save($TargetPath, $encoder, $encoderParams)
         
         $graphic.Dispose()
         $bitmap.Dispose()
         $image.Dispose()
-        Write-Host "Created thumbnail: $(Split-Path $SourcePath -Leaf)" -ForegroundColor Green
+        Write-Host "Created high-quality preview: $(Split-Path $SourcePath -Leaf)" -ForegroundColor Green
     } catch {
         Write-Host "Could not process $SourcePath : $_" -ForegroundColor Yellow
     }
@@ -55,16 +55,14 @@ foreach ($folder in $folders) {
             New-Item -ItemType Directory -Path $destDir -Force | Out-Null
         }
         
-        Write-Host "Generating thumbnails for: $folder..." -ForegroundColor Cyan
+        Write-Host "Generating high-quality previews for: $folder..." -ForegroundColor Cyan
         
         $files = Get-ChildItem -Path $srcDir -File -Include "*.jpg", "*.jpeg", "*.png", "*.JPG", "*.PNG" -Recurse | Where-Object { $_.FullName -notmatch "thumbnails" }
         
         foreach ($file in $files) {
             $targetPath = Join-Path $destDir $file.Name
-            # Only generate if thumbnail doesn't exist yet
-            if (!(Test-Path $targetPath)) {
-                Resize-Image -SourcePath $file.FullName -TargetPath $targetPath
-            }
+            # Always regenerate to overwrite the low-quality versions
+            Resize-Image -SourcePath $file.FullName -TargetPath $targetPath
         }
     }
 }
