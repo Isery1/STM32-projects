@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kollektionen | Framegeist</title>
+  <meta name="description" content="Framegeist | Persönliche Kollektionen und Fotogalerien.">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <script>
+    const savedLang = localStorage.getItem('preferredLang') || 'de';
+    document.documentElement.className = 'lang-' + savedLang;
+  </script>
+</head>
+<body class="lang-de">
+
+  <!-- ========== NAVIGATION ========== -->
+  <nav class="nav" id="nav">
+    <div class="container nav__inner">
+      <a href="index.html" class="nav__logo"><img src="favicon.png" alt="Framegeist Logo" class="nav__logo-icon"><span>Frame<span>geist</span></span></a>
+      <ul class="nav__links" id="navLinks">
+        <li><a href="index.html#home">Home</a></li>
+        <li><a href="index.html#about">
+          <span class="lang-de">Über mich</span>
+          <span class="lang-en">About Me</span>
+        </a></li>
+        <li><a href="index.html#gallery">
+          <span class="lang-de">Portfolio</span>
+          <span class="lang-en">Portfolio</span>
+        </a></li>
+        <li><a href="collections.html" style="color: var(--clr-gold-light);">
+          <span class="lang-de">Kollektionen</span>
+          <span class="lang-en">Collections</span>
+        </a></li>
+        <li><a href="index.html#services">
+          <span class="lang-de">Leistungen</span>
+          <span class="lang-en">Services</span>
+        </a></li>
+        <li><a href="index.html#contact">
+          <span class="lang-de">Kontakt</span>
+          <span class="lang-en">Contact</span>
+        </a></li>
+      </ul>
+      <div class="lang-switcher">
+        <button class="lang-btn active" data-lang="de">DE</button>
+        <span>/</span>
+        <button class="lang-btn" data-lang="en">EN</button>
+      </div>
+      <button class="nav__toggle" id="navToggle" aria-label="Menü">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <div style="height: 100px;"></div>
+
+  <!-- ========== GALLERY ========== -->
+  <section class="section gallery" id="gallery" style="min-height: 80vh;">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">
+          <span class="lang-de">Personen</span>
+          <span class="lang-en">People</span>
+        </p>
+        <h2 class="section-title lang-de">Persönliche <em>Kollektionen</em></h2>
+        <h2 class="section-title lang-en">Personal <em>Collections</em></h2>
+        <div class="section-divider"></div>
+      </div>
+
+      <!-- Category Filter -->
+      <div class="gallery__filters reveal">
+        <button class="gallery__filter active" data-filter="all">
+          <span class="lang-de">Alle</span>
+          <span class="lang-en">All</span>
+        </button>
+        <button class="gallery__filter" data-filter="david">
+          <span>David</span>
+        </button>
+        <button class="gallery__filter" data-filter="theresa">
+          <span>Theresa</span>
+        </button>
+      </div>
+
+      <div class="gallery__grid" id="galleryGrid">
+        <!-- Images populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== FOOTER ========== -->
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__logo">Frame<span>geist</span></div>
+      <p class="footer__copy lang-de">© 2026 Framegeist. Alle Rechte vorbehalten.</p>
+      <p class="footer__copy lang-en">© 2026 Framegeist. All rights reserved.</p>
+      <ul class="footer__social">
+        <li><a href="https://www.instagram.com" target="_blank" rel="noopener" aria-label="Instagram">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
+        </a></li>
+        <li><a href="mailto:kontakt@framegeist.at" aria-label="Email">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+        </a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <!-- ========== LIGHTBOX ========== -->
+  <div class="lightbox" id="lightbox">
+    <button class="lightbox__close" id="lightboxClose" aria-label="Schließen">✕</button>
+    <button class="lightbox__nav lightbox__prev" id="lightboxPrev" aria-label="Vorheriges Bild">‹</button>
+    <img class="lightbox__img" id="lightboxImg" src="" alt="">
+    <button class="lightbox__nav lightbox__next" id="lightboxNext" aria-label="Next">›</button>
+  </div>
+
+  <!-- ========== JAVASCRIPT ========== -->
+  <script>
+    // Split Babyfotos between David and Theresa as an example setup
+    const galleryImages = [
+      { src: "Babyfotos D&T/1-IMG_6908.jpg", category: "david" },
+      { src: "Babyfotos D&T/2-IMG_6908.jpg", category: "david" },
+      { src: "Babyfotos D&T/3-IMG_6918.jpg", category: "david" },
+      { src: "Babyfotos D&T/4-IMG_6923.jpg", category: "david" },
+      { src: "Babyfotos D&T/5-IMG_6934.jpg", category: "david" },
+      { src: "Babyfotos D&T/6-IMG_6941.jpg", category: "david" },
+      { src: "Babyfotos D&T/7-IMG_6942.jpg", category: "david" },
+      { src: "Babyfotos D&T/8-IMG_6946.jpg", category: "david" },
+      { src: "Babyfotos D&T/9-IMG_6956.jpg", category: "david" },
+      { src: "Babyfotos D&T/10-IMG_6964.jpg", category: "david" },
+      { src: "Babyfotos D&T/11-IMG_6984.jpg", category: "david" },
+      { src: "Babyfotos D&T/12-IMG_6984.jpg", category: "david" },
+      { src: "Babyfotos D&T/13-IMG_6985.jpg", category: "david" },
+      { src: "Babyfotos D&T/14-IMG_6994.jpg", category: "david" },
+      { src: "Babyfotos D&T/15-IMG_7001.jpg", category: "david" },
+      { src: "Babyfotos D&T/16-IMG_7005.jpg", category: "david" },
+      { src: "Babyfotos D&T/17-IMG_7005.jpg", category: "david" },
+      { src: "Babyfotos D&T/18-IMG_7021.jpg", category: "david" },
+      { src: "Babyfotos D&T/19-IMG_7038.jpg", category: "david" },
+      { src: "Babyfotos D&T/20-IMG_7050.jpg", category: "david" },
+      { src: "Babyfotos D&T/21-IMG_7054.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/22-IMG_7091.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/23-IMG_7100.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/24-IMG_7100.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/25-IMG_7110.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/26-IMG_7119.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/27-IMG_7136.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/28-IMG_7145.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/29-IMG_7157.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/30-IMG_7157.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/31-IMG_7173.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/32-IMG_7177.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/33-IMG_7179.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/34-IMG_7189.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/35-IMG_7204.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/36-IMG_7207.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/37-IMG_7209.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/38-IMG_7215.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/39-IMG_7218.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/40-IMG_7225.jpg", category: "theresa" },
+      { src: "Babyfotos D&T/41-IMG_7238.jpg", category: "theresa" }
+    ];
+
+    let activeFilter = 'all';
+    let filteredPool = [];
+    let visibleImages = [];
+    let cycleInterval = null;
+
+    function shuffleArray(array) {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function getThumbSrc(src) {
+      if (src.includes('Babyfotos D&T/')) return src.replace('Babyfotos D&T/', 'Babyfotos D&T/thumbnails/');
+      if (src.includes('Fotos/')) return src.replace('Fotos/', 'Fotos/thumbnails/');
+      return src;
+    }
+
+    function renderGallery(filter) {
+      const grid = document.getElementById('galleryGrid');
+      grid.innerHTML = '';
+      
+      if (cycleInterval) clearInterval(cycleInterval);
+
+      filteredPool = filter === 'all'
+        ? [...galleryImages]
+        : galleryImages.filter(img => img.category === filter);
+
+      const shuffled = shuffleArray(filteredPool);
+      visibleImages = shuffled.slice(0, Math.min(8, shuffled.length));
+
+      visibleImages.forEach((img, i) => {
+        const item = document.createElement('div');
+        item.className = 'gallery__item';
+        item.style.opacity = '1';
+        item.setAttribute('data-index', i);
+        const thumbSrc = getThumbSrc(img.src);
+        item.innerHTML = `<img src="${thumbSrc}" alt="Framegeist" loading="lazy">`;
+        item.addEventListener('click', () => openLightbox(img.src));
+        grid.appendChild(item);
+      });
+
+      if (filteredPool.length > visibleImages.length) {
+        cycleInterval = setInterval(swapRandomImage, 6000);
+      }
+    }
+
+    function swapRandomImage() {
+      const gridItems = document.querySelectorAll('#galleryGrid .gallery__item');
+      if (gridItems.length === 0) return;
+
+      const slotIndex = Math.floor(Math.random() * gridItems.length);
+      const targetItem = gridItems[slotIndex];
+      const currentSrcs = visibleImages.map(img => img.src);
+      const unusedPool = filteredPool.filter(img => !currentSrcs.includes(img.src));
+
+      if (unusedPool.length === 0) return;
+
+      const newImage = unusedPool[Math.floor(Math.random() * unusedPool.length)];
+      const preloader = new Image();
+      const thumbSrc = getThumbSrc(newImage.src);
+      preloader.src = thumbSrc;
+      
+      preloader.onerror = () => targetItem.style.opacity = '1';
+      preloader.onload = () => {
+        targetItem.style.opacity = '0';
+        setTimeout(() => {
+          const imgElement = targetItem.querySelector('img');
+          if (imgElement) imgElement.src = thumbSrc;
+          visibleImages[slotIndex] = newImage;
+          const newItem = targetItem.cloneNode(true);
+          newItem.addEventListener('click', () => openLightbox(newImage.src));
+          targetItem.replaceWith(newItem);
+          setTimeout(() => newItem.style.opacity = '1', 50);
+        }, 800);
+      };
+    }
+
+    document.querySelectorAll('.gallery__filter').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.gallery__filter').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeFilter = btn.dataset.filter;
+        renderGallery(activeFilter);
+      });
+    });
+
+    const langBtns = document.querySelectorAll('.lang-btn');
+    langBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const lang = btn.getAttribute('data-lang');
+        document.body.className = document.body.className.replace(/\blang-\w+\b/g, '');
+        document.body.classList.add(`lang-${lang}`);
+        document.documentElement.className = `lang-${lang}`;
+        langBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        localStorage.setItem('preferredLang', lang);
+      });
+    });
+
+    const currentLang = localStorage.getItem('preferredLang') || 'de';
+    document.body.className = document.body.className.replace(/\blang-\w+\b/g, '');
+    document.body.classList.add(`lang-${currentLang}`);
+    document.documentElement.className = `lang-${currentLang}`;
+    const activeBtn = document.querySelector(`.lang-btn[data-lang="${currentLang}"]`);
+    if (activeBtn) {
+      langBtns.forEach(b => b.classList.remove('active'));
+      activeBtn.classList.add('active');
+    }
+
+    const nav = document.getElementById('nav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 60);
+    });
+
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.getElementById('navLinks');
+    navToggle.addEventListener('click', () => navLinks.classList.toggle('open'));
+    navLinks.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => navLinks.classList.remove('open'));
+    });
+
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightboxImg');
+    let currentIndex = 0;
+
+    function openLightbox(src) {
+      currentIndex = filteredPool.findIndex(img => img.src === src);
+      if (currentIndex === -1) currentIndex = 0;
+      lightboxImg.classList.add('loading');
+      lightbox.classList.add('active');
+      document.body.style.overflow = 'hidden';
+      updateLightboxImage();
+    }
+
+    function updateLightboxImage() {
+      const imgUrl = filteredPool[currentIndex].src;
+      lightboxImg.classList.add('loading');
+      const tempImg = new Image();
+      tempImg.src = imgUrl;
+      tempImg.onload = () => {
+        lightboxImg.src = imgUrl;
+        lightboxImg.classList.remove('loading');
+        preloadNeighbors();
+      };
+    }
+
+    function preloadNeighbors() {
+      if (filteredPool.length <= 1) return;
+      const nextIdx = (currentIndex + 1) % filteredPool.length;
+      const prevIdx = (currentIndex - 1 + filteredPool.length) % filteredPool.length;
+      new Image().src = filteredPool[nextIdx].src;
+      new Image().src = filteredPool[prevIdx].src;
+    }
+
+    function closeLightbox() {
+      lightbox.classList.remove('active');
+      document.body.style.overflow = '';
+      setTimeout(() => {
+        lightboxImg.src = '';
+        lightboxImg.classList.add('loading');
+      }, 400);
+    }
+
+    document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox) closeLightbox();
+    });
+
+    document.getElementById('lightboxPrev').addEventListener('click', (e) => {
+      e.stopPropagation();
+      currentIndex = (currentIndex - 1 + filteredPool.length) % filteredPool.length;
+      updateLightboxImage();
+    });
+
+    document.getElementById('lightboxNext').addEventListener('click', (e) => {
+      e.stopPropagation();
+      currentIndex = (currentIndex + 1) % filteredPool.length;
+      updateLightboxImage();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!lightbox.classList.contains('active')) return;
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowLeft') document.getElementById('lightboxPrev').click();
+      if (e.key === 'ArrowRight') document.getElementById('lightboxNext').click();
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) entry.target.classList.add('visible');
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    // Initial render
+    renderGallery(activeFilter);
+  </script>
+</body>
+</html>
