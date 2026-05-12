@@ -73,11 +73,14 @@
           <span class="lang-de">Alle</span>
           <span class="lang-en">All</span>
         </button>
-        <button class="gallery__filter" data-filter="david">
-          <span>David</span>
+        <button class="gallery__filter" data-filter="daniel_tamari">
+          <span>Daniel & Tamari (Baby)</span>
         </button>
-        <button class="gallery__filter" data-filter="theresa">
-          <span>Theresa</span>
+        <button class="gallery__filter" data-filter="daniel_tami_hochzeit">
+          <span>Daniel & Tami (Hochzeit)</span>
+        </button>
+        <button class="gallery__filter" data-filter="michael_barbara">
+          <span>Michael & Barbara</span>
         </button>
       </div>
 
@@ -114,49 +117,59 @@
 
   <!-- ========== JAVASCRIPT ========== -->
   <script>
-    // Split Babyfotos between David and Theresa as an example setup
     const galleryImages = [
-      { src: "Babyfotos D&T/1-IMG_6908.jpg", category: "david" },
-      { src: "Babyfotos D&T/2-IMG_6908.jpg", category: "david" },
-      { src: "Babyfotos D&T/3-IMG_6918.jpg", category: "david" },
-      { src: "Babyfotos D&T/4-IMG_6923.jpg", category: "david" },
-      { src: "Babyfotos D&T/5-IMG_6934.jpg", category: "david" },
-      { src: "Babyfotos D&T/6-IMG_6941.jpg", category: "david" },
-      { src: "Babyfotos D&T/7-IMG_6942.jpg", category: "david" },
-      { src: "Babyfotos D&T/8-IMG_6946.jpg", category: "david" },
-      { src: "Babyfotos D&T/9-IMG_6956.jpg", category: "david" },
-      { src: "Babyfotos D&T/10-IMG_6964.jpg", category: "david" },
-      { src: "Babyfotos D&T/11-IMG_6984.jpg", category: "david" },
-      { src: "Babyfotos D&T/12-IMG_6984.jpg", category: "david" },
-      { src: "Babyfotos D&T/13-IMG_6985.jpg", category: "david" },
-      { src: "Babyfotos D&T/14-IMG_6994.jpg", category: "david" },
-      { src: "Babyfotos D&T/15-IMG_7001.jpg", category: "david" },
-      { src: "Babyfotos D&T/16-IMG_7005.jpg", category: "david" },
-      { src: "Babyfotos D&T/17-IMG_7005.jpg", category: "david" },
-      { src: "Babyfotos D&T/18-IMG_7021.jpg", category: "david" },
-      { src: "Babyfotos D&T/19-IMG_7038.jpg", category: "david" },
-      { src: "Babyfotos D&T/20-IMG_7050.jpg", category: "david" },
-      { src: "Babyfotos D&T/21-IMG_7054.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/22-IMG_7091.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/23-IMG_7100.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/24-IMG_7100.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/25-IMG_7110.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/26-IMG_7119.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/27-IMG_7136.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/28-IMG_7145.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/29-IMG_7157.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/30-IMG_7157.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/31-IMG_7173.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/32-IMG_7177.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/33-IMG_7179.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/34-IMG_7189.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/35-IMG_7204.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/36-IMG_7207.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/37-IMG_7209.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/38-IMG_7215.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/39-IMG_7218.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/40-IMG_7225.jpg", category: "theresa" },
-      { src: "Babyfotos D&T/41-IMG_7238.jpg", category: "theresa" }
+      // Daniel & Tamari Baby
+      { src: "Fotos/Daniel & Tamari Baby/1-IMG_6908.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/2-IMG_6908.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/3-IMG_6918.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/4-IMG_6923.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/5-IMG_6934.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/6-IMG_6941.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/7-IMG_6942.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/8-IMG_6946.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/9-IMG_6956.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/10-IMG_6964.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/11-IMG_6984.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/12-IMG_6984.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/13-IMG_6985.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/14-IMG_6994.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/15-IMG_7001.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/16-IMG_7005.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/17-IMG_7005.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/18-IMG_7021.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/19-IMG_7038.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/20-IMG_7050.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/21-IMG_7054.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/22-IMG_7091.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/23-IMG_7100.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/24-IMG_7100.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/25-IMG_7110.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/26-IMG_7119.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/27-IMG_7136.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/28-IMG_7145.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/29-IMG_7157.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/30-IMG_7157.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/31-IMG_7173.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/32-IMG_7177.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/33-IMG_7179.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/34-IMG_7189.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/35-IMG_7204.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/36-IMG_7207.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/37-IMG_7209.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/38-IMG_7215.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/39-IMG_7218.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/40-IMG_7225.jpg", category: "daniel_tamari" },
+      { src: "Fotos/Daniel & Tamari Baby/41-IMG_7238.jpg", category: "daniel_tamari" },
+      
+      // Daniel & Tami Hochzeit
+      { src: "Fotos/Daniel & Tami Hochzeit/IMG_5571.JPG", category: "daniel_tami_hochzeit" },
+      { src: "Fotos/Daniel & Tami Hochzeit/IMG_5615.JPG", category: "daniel_tami_hochzeit" },
+      { src: "Fotos/Daniel & Tami Hochzeit/IMG_5617.jpg", category: "daniel_tami_hochzeit" },
+
+      // Michael & Barbara
+      { src: "Fotos/Michael & Barbara/IMG_4888.JPG", category: "michael_barbara" },
+      { src: "Fotos/Michael & Barbara/IMG_4926.JPG", category: "michael_barbara" },
+      { src: "Fotos/Michael & Barbara/IMG_4930.JPG", category: "michael_barbara" }
     ];
 
     let activeFilter = 'all';
@@ -174,9 +187,9 @@
     }
 
     function getThumbSrc(src) {
-      if (src.includes('Babyfotos D&T/')) return src.replace('Babyfotos D&T/', 'Babyfotos D&T/thumbnails/');
-      if (src.includes('Fotos/')) return src.replace('Fotos/', 'Fotos/thumbnails/');
-      return src;
+      const parts = src.split('/');
+      parts.splice(parts.length - 1, 0, 'thumbnails');
+      return parts.join('/');
     }
 
     function renderGallery(filter) {

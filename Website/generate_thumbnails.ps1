@@ -67,16 +67,16 @@ $folders = @("Babyfotos D&T", "Fotos")
 foreach ($folder in $folders) {
     $srcDir = Join-Path $PSScriptRoot $folder
     if (Test-Path $srcDir) {
-        $destDir = Join-Path $srcDir "thumbnails"
-        if (!(Test-Path $destDir)) {
-            New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-        }
-        
         Write-Host "Generating high-quality previews for: $folder..." -ForegroundColor Cyan
         
         $files = Get-ChildItem -Path $srcDir -File -Include "*.jpg", "*.jpeg", "*.png", "*.JPG", "*.PNG" -Recurse | Where-Object { $_.FullName -notmatch "thumbnails" }
         
         foreach ($file in $files) {
+            $destDir = Join-Path $file.DirectoryName "thumbnails"
+            if (!(Test-Path $destDir)) {
+                New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+            }
+            
             $targetPath = Join-Path $destDir $file.Name
             # Always regenerate to overwrite the low-quality versions
             Resize-Image -SourcePath $file.FullName -TargetPath $targetPath
