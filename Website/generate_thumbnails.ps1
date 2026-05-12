@@ -9,6 +9,23 @@ function Resize-Image {
     try {
         $image = [System.Drawing.Image]::FromFile($SourcePath)
         
+        # Handle EXIF orientation metadata (PropertyId 0x0112)
+        try {
+            $orientationProp = $image.GetPropertyItem(0x0112)
+            $orientation = [BitConverter]::ToUInt16($orientationProp.Value, 0)
+            switch ($orientation) {
+                2 { $image.RotateFlip([System.Drawing.RotateFlipType]::RotateNoneFlipX) }
+                3 { $image.RotateFlip([System.Drawing.RotateFlipType]::Rotate180FlipNone) }
+                4 { $image.RotateFlip([System.Drawing.RotateFlipType]::RotateNoneFlipY) }
+                5 { $image.RotateFlip([System.Drawing.RotateFlipType]::Rotate270FlipX) }
+                6 { $image.RotateFlip([System.Drawing.RotateFlipType]::Rotate90FlipNone) }
+                7 { $image.RotateFlip([System.Drawing.RotateFlipType]::Rotate90FlipX) }
+                8 { $image.RotateFlip([System.Drawing.RotateFlipType]::Rotate270FlipNone) }
+            }
+        } catch {
+            # No EXIF orientation tag found, no rotation needed
+        }
+        
         $ratio = $image.Height / $image.Width
         $newWidth = $image.Width
         $newHeight = $image.Height
