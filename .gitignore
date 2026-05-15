@@ -6,3 +6,14 @@ Thumbs.db
 
 # Local tooling (if used at repo root)
 .metadata/
+
+# Full workspace checkout: STM32 / portfolio (not shipped in this product repo)
+Impedance/
+SPI_Loopback/
+Test/
+handover_report.md
+
+# Website tree on disk may contain extra assets; only employees.json + rfid_api.php are tracked
+Website/*
+!Website/employees.json
+!Website/rfid_api.php
