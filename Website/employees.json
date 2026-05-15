@@ -1,4 +1,5 @@
 {
+    "_about": "Badge UID (string keys) mapped to display names for the terminal overlay and web dashboard. Keys starting with underscore are ignored by the API. Match keys to the UID your reader sends (often digits only).",
     "250256679402": "Matthias",
     "994957272441": "Jane"
 }

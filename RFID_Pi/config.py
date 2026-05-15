@@ -1,3 +1,10 @@
+"""
+Central configuration for the Raspberry Pi RFID terminal.
+
+Loads settings from environment variables (optionally via a local ``.env`` file), builds full HTTP URLs
+for auth, scans, heartbeat, and status queries, and exposes a small validator used at process start.
+"""
+
 import os
 from dotenv import load_dotenv
 
@@ -33,19 +40,28 @@ DEVICE_SECRET = os.getenv("DEVICE_SECRET", "dev-secret")
 SCAN_COOLDOWN_SECONDS = float(os.getenv("SCAN_COOLDOWN_SECONDS", "2.0"))
 HEARTBEAT_INTERVAL_SECONDS = float(os.getenv("HEARTBEAT_INTERVAL_SECONDS", "45.0"))
 
-def validate_config():
-    """Validates critical configurations exist."""
+
+def validate_config() -> None:
+    """
+    Ensure ``SERVER_URL``, ``DEVICE_ID``, and ``DEVICE_SECRET`` are non-empty before the app runs.
+
+    Raises:
+        ValueError: With a short checklist message if anything required is missing.
+
+    Side effect:
+        Prints a friendly summary of endpoints to stdout when validation passes.
+    """
     critical_vars = {
         "SERVER_URL": SERVER_URL,
         "DEVICE_ID": DEVICE_ID,
         "DEVICE_SECRET": DEVICE_SECRET
     }
-    
+
     missing = [key for key, value in critical_vars.items() if not value]
     if missing:
         raise ValueError(f"Missing required configuration values: {', '.join(missing)}. "
                          f"Please check your environment variables or .env file.")
-    
+
     print("--- Configuration Loaded Successfully ---")
     print(f"Server: {SERVER_URL}")
     print(f"Auth Endpoint: {AUTH_URL}")

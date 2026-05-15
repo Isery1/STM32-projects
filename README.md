@@ -1,3 +1,7 @@
+<!--
+  ManageIO Terminal — repository overview (Markdown).
+  Describes what lives in each folder and how main vs develop branches are used.
+-->
 # ManageIO Terminal
 
 Raspberry Pi RFID time client (`RFID_Pi/`) and PHP backend files for the web server (`Website/`).

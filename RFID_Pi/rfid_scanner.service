@@ -1,5 +1,10 @@
+# systemd unit — ManageIO RFID terminal (headless main.py).
+# Install: copy to /etc/systemd/system/, run systemctl daemon-reload && enable --now rfid_scanner.service
+# Adjust User, paths, and ExecStart if your home directory or venv location differs.
+
 [Unit]
-Description=Raspberry Pi RFID Server Sync Daemon
+Description=ManageIO RFID terminal — scan uploads and heartbeat to PHP backend
+Documentation=file:///home/pi/RFID_Pi/README.md
 After=network-online.target
 Wants=network-online.target
 

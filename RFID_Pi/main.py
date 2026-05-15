@@ -1,3 +1,11 @@
+"""
+Headless Raspberry Pi entrypoint for the ManageIO RFID terminal.
+
+After configuration and optional startup checks, opens the MFRC522 reader (or a mock on non-Pi machines),
+keeps a JWT session alive, sends periodic heartbeats, and posts every successful tag read to the server.
+Use ``python main.py --gui`` to launch the kiosk UI defined in :mod:`gui_poc` instead of this loop.
+"""
+
 import sys
 import os
 import time
@@ -23,7 +31,7 @@ try:
     # Allow forcing mock behavior via environment flag
     if os.getenv("USE_MOCK_RFID", "False").lower() in ("true", "1", "yes"):
         raise ImportError("Forced local mock via environment setting")
-    
+
     import RPi.GPIO as GPIO
     from mfrc522 import SimpleMFRC522
     logger.info("Detected Raspberry Pi environment. Loaded RPi.GPIO and SimpleMFRC522 hardware drivers.")
@@ -33,9 +41,16 @@ except ImportError as e:
     logger.warning("Could not load hardware libraries. Falling back to Simulated Mock Reader.")
     logger.warning(f"Root cause: {e}")
 
-def main(skip_boot_checks: bool = False):
+
+def main(skip_boot_checks: bool = False) -> None:
+    """
+    Run the blocking scan loop: authenticate, heartbeat, read tag IDs, post punches.
+
+    Args:
+        skip_boot_checks: If ``True``, skip RFID/network/server verification (``--no-boot-check``).
+    """
     logger.info("Starting Raspberry Pi RFID Scanner Application...")
-    
+
     # 1. Config validation
     try:
         config.validate_config()
@@ -51,7 +66,7 @@ def main(skip_boot_checks: bool = False):
     # 2. Instancing drivers and web session
     reader = SimpleMFRC522()
     api_session = AuthenticatedSession()
-    
+
     # 3. Self-Healing Operational Loop
     last_hb = 0.0
     try:
@@ -118,7 +133,9 @@ def main(skip_boot_checks: bool = False):
                 logger.error(f"Failed to clean up GPIO: {cleanup_err}")
         logger.info("Application shutdown complete.")
 
+
 if __name__ == "__main__":
+    # CLI: headless loop by default, or ``--gui`` for the kiosk (see :mod:`gui_poc`).
     import argparse
 
     parser = argparse.ArgumentParser(description="RFID Pi client")

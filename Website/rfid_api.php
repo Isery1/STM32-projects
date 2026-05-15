@@ -1,10 +1,14 @@
 <?php
 /**
- * Lightweight RFID PHP Backend
- * Implements:
- *  - JWT Token Authentication (HS256)
- *  - Secure JSON Scan Submission
- *  - Beautiful Modern Visual Web Dashboard
+ * ManageIO / RFID time terminal — PHP backend (single-file app)
+ *
+ * What this script does in plain language:
+ * - Terminals log in with a shared device secret and receive a short-lived JWT.
+ * - Each badge scan is stored as a line in scans.log; the server alternates check-in vs check-out from history.
+ * - The same file serves a small browser dashboard (default action) and JSON APIs for the Pi client and live refresh.
+ * - Worked-time today is derived from in/out pairs in the log using the server timezone (RFID_APP_TZ).
+ *
+ * @package ManageIO\Terminal
  */
 
 // ================= CONFIGURATION =================
@@ -25,7 +29,12 @@ $DEVICES_FILE = __DIR__ . '/devices.json';
 $EMPLOYEES_FILE = __DIR__ . '/employees.json';
 // =================================================
 
-/** Normalize badge UID for keys, log rows, and employee map lookup (JSON int/float/scientific vs string). */
+/**
+ * Turn any badge identifier from JSON or the log into one canonical string so lookups stay consistent.
+ *
+ * @param mixed $uid Raw UID from the client or a log field (string, int, float, scientific notation).
+ * @return string Normalized UID, or empty string if nothing usable was provided.
+ */
 function normalize_uid($uid) {
     if ($uid === null || $uid === '') {
         return '';
@@ -57,21 +66,39 @@ function normalize_uid($uid) {
     return $s;
 }
 
+/**
+ * Load the registered-device registry from a JSON file (returns an empty array if missing or invalid).
+ *
+ * @param string $file Absolute path to devices.json (or equivalent).
+ * @return array<string, array<string, mixed>> Device id => metadata (status, first_seen, last_seen, …).
+ */
 function load_devices($file) {
     if (!file_exists($file)) return [];
     $raw = @file_get_contents($file);
     return json_decode($raw, true) ?? [];
 }
 
-// Helper: Safe Save JSON Device Database
+/**
+ * Persist the device registry with pretty-printed JSON and a filesystem lock to reduce corruption on concurrent writes.
+ *
+ * @param string $file Path to the JSON file.
+ * @param array $data Full device map to write.
+ */
 function save_devices($file, $data) {
     file_put_contents($file, json_encode($data, JSON_PRETTY_PRINT), LOCK_EX);
 }
 
 /**
- * Parse scans.log (newest rows first in ['scans'], authoritative per-UID state in ['last_by_uid']).
- * Log line format: server_time,device_id,uid,event[,client_local_time]
- * Legacy 3-field lines are treated as event "in".
+ * Read scans.log into structures the API and dashboard can use.
+ *
+ * Log line format: server_time,device_id,uid,event[,client_local_time]. Older three-field lines count as check-in.
+ * - scans: newest punch first (reversed chronological).
+ * - rows_chrono: same rows in file order (oldest → newest) for worked-time math.
+ * - last_by_uid: latest row per badge (authoritative in/out state).
+ * - present: everyone whose last event is still "in".
+ *
+ * @param string $logFile Path to scans.log.
+ * @return array{scans: array, present: array, last_by_uid: array, rows_chrono: array}
  */
 function parse_scans_log_file($logFile) {
     $lastByUid = [];
@@ -125,6 +152,14 @@ function parse_scans_log_file($logFile) {
     ];
 }
 
+/**
+ * Load optional friendly names for badge UIDs from employees.json.
+ *
+ * Keys starting with "_" are ignored so you can store file-level notes inside the same JSON object.
+ *
+ * @param string $empFile Path to employees.json.
+ * @return array<string, string> Normalized UID => display name.
+ */
 function load_employee_names($empFile) {
     if (!file_exists($empFile)) {
         return [];
@@ -136,6 +171,9 @@ function load_employee_names($empFile) {
     }
     $out = [];
     foreach ($data as $k => $v) {
+        if (is_string($k) && $k !== '' && $k[0] === '_') {
+            continue;
+        }
         $nk = normalize_uid($k);
         if ($nk !== '' && $v !== null && (string)$v !== '') {
             $out[$nk] = (string)$v;
@@ -144,6 +182,13 @@ function load_employee_names($empFile) {
     return $out;
 }
 
+/**
+ * Resolve the greeting name for a badge: employee map if present, otherwise a short "Badge …" fallback.
+ *
+ * @param mixed $uid Badge UID from the request or log.
+ * @param array<string, string> $namesMap From load_employee_names().
+ * @return string Human-readable label.
+ */
 function display_name_for_uid($uid, $namesMap) {
     $nuid = normalize_uid($uid);
     if ($nuid !== '' && isset($namesMap[$nuid]) && (string)$namesMap[$nuid] !== '') {
@@ -153,6 +198,12 @@ function display_name_for_uid($uid, $namesMap) {
     return 'Badge ' . $tail;
 }
 
+/**
+ * Format a duration as "H:MM" for dashboard and terminal text (hours not padded, minutes zero-padded).
+ *
+ * @param int $seconds Non-negative seconds.
+ * @return string e.g. "7:05"
+ */
 function format_hm_from_seconds($seconds) {
     $seconds = max(0, (int)$seconds);
     $h = intdiv($seconds, 3600);
@@ -160,6 +211,12 @@ function format_hm_from_seconds($seconds) {
     return sprintf('%d:%02d', $h, $m);
 }
 
+/**
+ * Bucket a Unix timestamp into a simple part of day (morning, lunch, …) for friendly copy.
+ *
+ * @param int $ts Unix timestamp in the server timezone context.
+ * @return string One of: morning, lunch, afternoon, evening, night.
+ */
 function daypart_key_for_ts($ts) {
     $h = (int)date('G', $ts);
     if ($h >= 5 && $h < 12) {
@@ -177,7 +234,14 @@ function daypart_key_for_ts($ts) {
     return 'night';
 }
 
-/** Parse scan log timestamps (server format + ISO + strtotime). */
+/**
+ * Parse a punch timestamp from the log into a Unix timestamp (false on failure).
+ *
+ * Tries explicit formats first, then a short prefix for noisy strings, then strtotime().
+ *
+ * @param string $timeStr Raw time field from scans.log.
+ * @return int|false
+ */
 function parse_scan_log_timestamp($timeStr) {
     $s = trim((string)$timeStr);
     if ($s === '') {
@@ -201,6 +265,18 @@ function parse_scan_log_timestamp($timeStr) {
     return $t === false ? false : $t;
 }
 
+/**
+ * Sum seconds worked on one calendar day for one badge from in/out pairs in chronological rows.
+ *
+ * Handles consecutive check-ins by closing the previous open interval at the next in time (forgot checkout).
+ * An open check-in that has no matching out yet runs until $nowTs (capped to end of day).
+ *
+ * @param array<int, array<string, mixed>> $rowsChrono Rows from parse_scans_log_file()['rows_chrono'].
+ * @param mixed $uid Badge UID to filter.
+ * @param string $dayYmd Calendar day "Y-m-d" in server TZ.
+ * @param int $nowTs Current time as Unix timestamp (for open interval).
+ * @return int Seconds worked that day.
+ */
 function worked_seconds_on_local_day($rowsChrono, $uid, $dayYmd, $nowTs) {
     $nuid = normalize_uid($uid);
     if ($nuid === '') {
@@ -255,6 +331,12 @@ function worked_seconds_on_local_day($rowsChrono, $uid, $dayYmd, $nowTs) {
     return $total;
 }
 
+/**
+ * Short greeting word for terminal messages based on time of day.
+ *
+ * @param int $ts Unix timestamp.
+ * @return string e.g. "Good morning"
+ */
 function build_terminal_greeting_word($ts) {
     $dp = daypart_key_for_ts($ts);
     if ($dp === 'morning') {
@@ -272,6 +354,15 @@ function build_terminal_greeting_word($ts) {
     return 'Hello';
 }
 
+/**
+ * One friendly sentence after a successful punch (in or out) for the Pi overlay or logs.
+ *
+ * @param array<string, string> $namesMap Employee display names.
+ * @param mixed $uid Badge UID.
+ * @param string $event "in" or "out".
+ * @param string $serverTime Server time string of the punch.
+ * @return string Message for the user.
+ */
 function build_terminal_message_scan($namesMap, $uid, $event, $serverTime) {
     $name = display_name_for_uid($uid, $namesMap);
     $ts = strtotime($serverTime) ?: time();
@@ -294,6 +385,16 @@ function build_terminal_message_scan($namesMap, $uid, $event, $serverTime) {
     return "{$greet}, {$name} — check-out recorded. See you soon!";
 }
 
+/**
+ * Longer status text when the user taps "State Info" / flextime / holiday (read-only query, no new punch).
+ *
+ * @param array<string, string> $namesMap Employee names.
+ * @param mixed $uid Badge UID.
+ * @param array<string, array<string, mixed>> $lastByUid From parse_scans_log_file().
+ * @param string $workedHm Already formatted "H:MM" for today.
+ * @param string $queryKind status|flextime|holiday
+ * @return string
+ */
 function build_terminal_message_query($namesMap, $uid, $lastByUid, $workedHm, $queryKind) {
     $name = display_name_for_uid($uid, $namesMap);
     $greet = build_terminal_greeting_word(time());
@@ -321,6 +422,14 @@ function build_terminal_message_query($namesMap, $uid, $lastByUid, $workedHm, $q
     return $base;
 }
 
+/**
+ * Build one dashboard row per person who has activity or state today: name, in/out, worked time.
+ *
+ * @param string $logFile Path to scans.log (used only if $parsed is null).
+ * @param array<string, string> $namesMap Employee names.
+ * @param array|null $parsed Pre-parsed log or null to parse fresh.
+ * @return array<int, array<string, mixed>> List of summary dicts sorted by display name.
+ */
 function build_today_summary_list($logFile, $namesMap, $parsed = null) {
     if ($parsed === null) {
         $parsed = parse_scans_log_file($logFile);
@@ -350,12 +459,20 @@ function build_today_summary_list($logFile, $namesMap, $parsed = null) {
             'worked_today_hm' => format_hm_from_seconds($sec),
         ];
     }
+    // Sort alphabetically by friendly name so the dashboard “today” grid stays easy to scan.
     usort($out, function ($a, $b) {
         return strcmp($a['display_name'], $b['display_name']);
     });
     return $out;
 }
 
+/**
+ * Decide whether the next scan for this badge should be recorded as check-in or check-out.
+ *
+ * @param array<string, array<string, mixed>> $lastByUid Latest row per UID.
+ * @param mixed $uid Badge UID from the current request.
+ * @return string "in" or "out"
+ */
 function next_punch_event_for_uid($lastByUid, $uid) {
     $n = normalize_uid($uid);
     if ($n === '' || !isset($lastByUid[$n])) {
@@ -364,7 +481,11 @@ function next_punch_event_for_uid($lastByUid, $uid) {
     return ($lastByUid[$n]['event'] === 'in') ? 'out' : 'in';
 }
 
-/** Server-local time-of-day messaging for the dashboard */
+/**
+ * Short title + message for the web dashboard header based on the current server clock.
+ *
+ * @return array{title: string, message: string}
+ */
 function daypart_banner() {
     $h = (int)date('G');
     if ($h >= 5 && $h < 12) {
@@ -397,6 +518,11 @@ function daypart_banner() {
     ];
 }
 
+/**
+ * Read JWT from Authorization or X-Authorization headers (Apache sometimes hides Authorization; we check both).
+ *
+ * @return string|null Raw JWT string without "Bearer ", or null.
+ */
 function extract_bearer_token() {
     $authHeader = "";
     if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
@@ -416,6 +542,13 @@ function extract_bearer_token() {
     return $matches[1];
 }
 
+/**
+ * Update last_seen (and ensure the device record exists) after auth, heartbeat, or scan.
+ *
+ * @param string $devicesFile Path to devices.json.
+ * @param string $deviceId Terminal id from JWT payload.
+ * @param string $when Human-readable timestamp string stored in the registry.
+ */
 function touch_device_last_seen($devicesFile, $deviceId, $when) {
     $devices = load_devices($devicesFile);
     if (!isset($devices[$deviceId])) {
@@ -438,17 +571,33 @@ header("Content-Type: application/json; charset=utf-8");
 // Determine requested action
 $action = isset($_GET['action']) ? $_GET['action'] : 'dashboard';
 
-// Helper: Base64URL Encoding for JWT
+/**
+ * Base64url-encode a string (JWT uses URL-safe base64 without padding).
+ *
+ * @param string $text
+ * @return string
+ */
 function base64UrlEncode($text) {
     return str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($text));
 }
 
-// Helper: Base64URL Decoding
+/**
+ * Decode a base64url segment back to binary/string for JWT verification.
+ *
+ * @param string $text
+ * @return string|false
+ */
 function base64UrlDecode($text) {
     return base64_decode(str_replace(['-', '_'], ['+', '/'], $text));
 }
 
-// Helper: Create HS256 JWT Token
+/**
+ * Mint a short-lived HS256 JWT for a device after successful login.
+ *
+ * @param string $dev_id Device identifier embedded in the payload.
+ * @param string $secret_key Server signing key (keep private).
+ * @return string Three-part JWT.
+ */
 function generate_jwt($dev_id, $secret_key) {
     $header = json_encode(['typ' => 'JWT', 'alg' => 'HS256']);
     $payload = json_encode([
@@ -466,7 +615,13 @@ function generate_jwt($dev_id, $secret_key) {
     return $baseHeader . "." . $basePayload . "." . $baseSignature;
 }
 
-// Helper: Verify HS256 JWT Token
+/**
+ * Validate JWT signature and expiry; return decoded payload array or false.
+ *
+ * @param string $jwt Full JWT from the Authorization header.
+ * @param string $secret_key Same key used when signing.
+ * @return array<string, mixed>|false Payload including device_id and exp, or false.
+ */
 function verify_jwt($jwt, $secret_key) {
     $parts = explode('.', $jwt);
     if (count($parts) !== 3) return false;

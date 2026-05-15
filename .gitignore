@@ -1,3 +1,8 @@
+# -----------------------------------------------------------------------------
+# ManageIO Terminal — ignore local-only noise in a mixed CubeIDE + product checkout.
+# Tracked product paths: RFID_Pi/, Website/employees.json, Website/rfid_api.php, README.
+# -----------------------------------------------------------------------------
+
 # OS / editor
 .DS_Store
 Thumbs.db

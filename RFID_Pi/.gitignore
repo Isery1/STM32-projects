@@ -1,3 +1,5 @@
+# RFID_Pi — ignore secrets, bytecode, and local venvs (this folder is the Pi client package).
+
 # Secrets & local config (use .env.example as a template)
 .env
 

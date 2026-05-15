@@ -1,7 +1,11 @@
 """
-RFID kiosk terminal: Tkinter UI + MFRC522 (or mock) + server upload via AuthenticatedSession.
-RFID polling runs on a background thread; HTTP runs in a worker thread; UI updates on the main thread.
+Touch-friendly kiosk UI for the ManageIO RFID terminal (Tkinter).
+
+The main window shows a large clock, optional startup checks on first launch, and an overlay for scan
+feedback. RFID blocking reads run on a background thread; HTTP calls run in short worker threads;
+all widget updates are marshalled back onto the Tk main thread via ``after``.
 """
+
 import sys
 import os
 import time
@@ -28,7 +32,12 @@ logger = logging.getLogger(__name__)
 
 
 def _create_reader():
-    """Return (reader, is_mock, gpio_module_or_none). Matches headless main.py behavior."""
+    """
+    Instantiate the RFID stack used by the kiosk (real ``SimpleMFRC522`` or :class:`mock_rfid.MockSimpleMFRC522`).
+
+    Returns:
+        tuple: ``(reader, is_mock: bool, gpio_module | None)`` — GPIO module is only set on real hardware.
+    """
     if os.getenv("USE_MOCK_RFID", "False").lower() in ("true", "1", "yes"):
         from mock_rfid import MockSimpleMFRC522 as _Reader
 
@@ -48,7 +57,17 @@ def _create_reader():
 
 
 class KioskApp(tk.Tk):
+    """Root Tk window: boot splash (optional) + idle clock UI + scan overlay + footer actions."""
+
     def __init__(self, defer_boot_sequence: bool = False):
+        """
+        Build the shell.
+
+        Args:
+            defer_boot_sequence: If ``True``, show the three-line boot checklist and only construct
+                the reader/session after it passes; if ``False``, go straight to the operational UI
+                (used when boot checks were already run headlessly).
+        """
         super().__init__()
 
         self.title("RFID Time Terminal Kiosk")
@@ -83,6 +102,7 @@ class KioskApp(tk.Tk):
         self._complete_initialization_after_boot()
 
     def _build_boot_screen(self):
+        """Lay out the pre-flight checklist labels before hardware and network are touched."""
         wrap = tk.Frame(self, bg=self.COLORS["bg"])
         wrap.pack(expand=True, fill="both", padx=40, pady=36)
         self._boot_wrap = wrap
@@ -132,6 +152,7 @@ class KioskApp(tk.Tk):
             self._boot_detail_labels[key] = lbl
 
     def _kickoff_boot_sequence(self):
+        """Start :func:`boot_sequence.run_boot_checks` on a daemon thread; funnel UI updates through ``after``."""
         if self._closing:
             return
 
@@ -154,6 +175,7 @@ class KioskApp(tk.Tk):
         threading.Thread(target=worker, daemon=True).start()
 
     def _apply_boot_step(self, phase: str, state: str, detail: str = ""):
+        """Apply one ``on_step`` notification from the boot thread (must run on the Tk main thread)."""
         if self._closing or not self.winfo_exists():
             return
         lbl = self._boot_detail_labels.get(phase)
@@ -177,6 +199,7 @@ class KioskApp(tk.Tk):
             self._boot_subtitle.config(text=subtitle, fg=self.COLORS["subtext"])
 
     def _boot_sequence_ok(self):
+        """Brief success message, then tear down the splash and mount the real kiosk chrome."""
         if self._closing or not self.winfo_exists():
             return
         if self._boot_subtitle:
@@ -187,6 +210,7 @@ class KioskApp(tk.Tk):
         self.after(350, self._finalize_boot_transition)
 
     def _finalize_boot_transition(self):
+        """Destroy boot frames and call :meth:`_complete_initialization_after_boot`."""
         if self._closing or not self.winfo_exists():
             return
         if self._boot_wrap is not None:
@@ -195,6 +219,7 @@ class KioskApp(tk.Tk):
         self._complete_initialization_after_boot()
 
     def _boot_sequence_failed(self, err: BaseException):
+        """Show the captured exception on the splash; operator closes the window manually."""
         if self._closing or not self.winfo_exists():
             return
         msg = str(err)
@@ -224,6 +249,7 @@ class KioskApp(tk.Tk):
         ).pack(pady=(8, 0))
 
     def _complete_initialization_after_boot(self):
+        """Wire session + reader, build widgets, and spawn the RFID polling thread."""
         self.api_session = AuthenticatedSession()
         self.reader, self._is_mock_hw, self._gpio = _create_reader()
 
@@ -249,6 +275,7 @@ class KioskApp(tk.Tk):
         self._rfid_thread.start()
 
     def _schedule_heartbeat(self):
+        """Recurring timer: send heartbeat while authenticated; reschedules itself."""
         if not self.winfo_exists():
             return
         if self.api_session.is_approved:
@@ -257,6 +284,7 @@ class KioskApp(tk.Tk):
         self.after(hb_ms, self._schedule_heartbeat)
 
     def create_styles(self):
+        """Configure ttk styles for large-footprint kiosk buttons."""
         self.style = ttk.Style(self)
         self.style.theme_use("clam")
         self.style.configure(
@@ -276,6 +304,7 @@ class KioskApp(tk.Tk):
         )
 
     def build_ui_frames(self):
+        """Create header/body/footer structure, clock labels, overlay region, and footer buttons."""
         self.header = tk.Frame(self, bg=self.COLORS["bg"], height=60)
         self.header.pack(side="top", fill="x", padx=20, pady=10)
 
@@ -369,6 +398,7 @@ class KioskApp(tk.Tk):
         self.lbl_instruction.bind("<Button-1>", lambda e: self._on_card_uid("MOCK_CLICK_001"))
 
     def _poll_auth_beacon(self):
+        """Toggle the small header LED text between online (green) and retrying (amber)."""
         if not self.winfo_exists():
             return
         if self.api_session.is_approved:
@@ -384,6 +414,7 @@ class KioskApp(tk.Tk):
         self.after(2000, self._poll_auth_beacon)
 
     def _rfid_listen_loop(self):
+        """Background loop: wait for tags, push UIDs to :meth:`_on_card_uid` on the UI thread."""
         logger.info("RFID listener thread started.")
         while self.rfid_listener_active:
             while self.rfid_listener_active and not self.api_session.is_approved:
@@ -413,6 +444,11 @@ class KioskApp(tk.Tk):
                 time.sleep(config.SCAN_COOLDOWN_SECONDS)
 
     def _on_card_uid(self, uid):
+        """
+        Begin an HTTP round-trip for the given UID (punch or query depending on ``active_action``).
+
+        Serialised with ``_scan_ui_lock`` so rapid taps do not interleave requests.
+        """
         if not self.winfo_exists():
             return
         if not self._scan_ui_lock.acquire(blocking=False):
@@ -449,6 +485,7 @@ class KioskApp(tk.Tk):
         threading.Thread(target=worker, daemon=True).start()
 
     def _after_scan_upload(self, uid, result, pending_context):
+        """Populate the overlay with success or failure copy, then auto-return to idle after a delay."""
         try:
             self._scan_ui_lock.release()
         except RuntimeError:
@@ -510,6 +547,12 @@ class KioskApp(tk.Tk):
         self.timeout_timer = self.after(4000, self.revert_to_rest)
 
     def action_button_clicked(self, action_type):
+        """
+        Footer buttons: switch to “wait for card” mode with a contextual overlay title.
+
+        Args:
+            action_type: ``CHECK_STATUS`` | ``FLEXTIME`` | ``HOLIDAY`` — forwarded to the query API.
+        """
         self.current_state = "WAITING_CARD"
         self.active_action = action_type
 
@@ -535,6 +578,7 @@ class KioskApp(tk.Tk):
         self.timeout_timer = self.after(10000, self.revert_to_rest)
 
     def revert_to_rest(self):
+        """Hide overlay, show the clock screen again, and clear timers."""
         self.current_state = "REST"
         self.active_action = None
         self.overlay_frame.pack_forget()
@@ -544,6 +588,7 @@ class KioskApp(tk.Tk):
             self.timeout_timer = None
 
     def update_clock(self):
+        """Refresh date/time labels once per second while ``clock_active`` is true."""
         now = datetime.datetime.now()
         self.lbl_time.config(text=now.strftime("%H:%M:%S"))
         self.lbl_date.config(text=now.strftime("%A, %d. %B %Y"))
@@ -551,6 +596,7 @@ class KioskApp(tk.Tk):
             self.after(1000, self.update_clock)
 
     def _on_close(self):
+        """Stop threads cleanly, release GPIO on real hardware, and destroy the Tk root."""
         logger.info("Shutting down kiosk…")
         self._closing = True
         self.clock_active = False
@@ -568,6 +614,12 @@ class KioskApp(tk.Tk):
 
 
 def run_kiosk(skip_boot_checks: bool = False):
+    """
+    Entrypoint: validate ``.env``, optionally run boot checks, then open :class:`KioskApp`.
+
+    Args:
+        skip_boot_checks: Passed through to skip both inline and environment-driven boot sequences.
+    """
     try:
         config.validate_config()
     except ValueError as err:
@@ -589,6 +641,7 @@ def run_kiosk(skip_boot_checks: bool = False):
 
 
 if __name__ == "__main__":
+    # Allow ``python gui_poc.py`` with optional ``--no-boot-check``.
     import argparse
 
     p = argparse.ArgumentParser(description="RFID kiosk GUI")

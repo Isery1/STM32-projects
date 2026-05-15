@@ -1,2 +1,4 @@
+# Lighter stack for laptops running only the mock reader (no spidev / MFRC522 wheels).
+# Use when developing auth/UI logic without Pi hardware.
 requests>=2.31.0
 python-dotenv>=1.0.0

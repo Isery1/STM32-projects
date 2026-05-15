@@ -1,6 +1,9 @@
+<!--
+  RFID_Pi package README: hardware wiring, .env template pointers, and how to run headless vs kiosk GUI.
+-->
 # Raspberry Pi RFID Tag Scanner
 
-A lightweight Python service that interface with an MFRC522 RFID reader over the SPI bus, reads card UIDs, and securely transmits scan records to a remote server via HTTP POST using JWT authentication.
+A lightweight Python service that interfaces with an MFRC522 RFID reader over the SPI bus, reads card UIDs, and securely transmits scan records to a remote server via HTTP POST using JWT authentication.
 
 ## Features
 - **JWT Token Authentication**: Automatic token renewal and lazy-retry on `401 Unauthorized` errors.

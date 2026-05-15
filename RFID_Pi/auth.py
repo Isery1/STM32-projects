@@ -1,3 +1,10 @@
+"""
+HTTP session for the ManageIO RFID terminal.
+
+Handles device login (shared secret → JWT), automatic re-auth when tokens expire, and all POSTs the
+Pi needs: punches, read-only status queries, and lightweight heartbeats so the dashboard stays “live”.
+"""
+
 import logging
 from typing import Any, Dict, Optional
 
@@ -9,7 +16,10 @@ logger = logging.getLogger(__name__)
 
 
 class AuthenticatedSession:
-    def __init__(self):
+    """Small wrapper around ``requests.Session`` with JWT lifecycle for the terminal API."""
+
+    def __init__(self) -> None:
+        """Create a fresh session with JSON headers; no token until :meth:`authenticate` succeeds."""
         self.session = requests.Session()
         self.jwt_token = None
         self.is_approved = False
@@ -21,8 +31,16 @@ class AuthenticatedSession:
             }
         )
 
-    def authenticate(self, silent=False) -> bool:
-        """Attempts to authenticate against the server using configured credentials."""
+    def authenticate(self, silent: bool = False) -> bool:
+        """
+        Exchange ``DEVICE_ID`` / ``DEVICE_SECRET`` for a JWT and attach it to outgoing requests.
+
+        Returns:
+            ``True`` if the server returned HTTP 200 and a token body field; ``False`` on denial or error.
+
+        Args:
+            silent: If ``True``, skip the usual “connecting…” log line (used during token refresh bursts).
+        """
         if not silent:
             logger.info(
                 "Authenticating device '%s' with server at %s...",
@@ -72,6 +90,7 @@ class AuthenticatedSession:
             return False
 
     def _post_scan_with_token_retry(self, payload: Dict[str, Any]) -> requests.Response:
+        """POST a punch; if the server answers 401, try a fresh login once and retry the same payload."""
         response = self.session.post(config.SCAN_URL, json=payload, timeout=10.0)
         if response.status_code == 401:
             logger.warning("Received 401 Unauthorized. Token may be expired. Attempting re-authentication...")
@@ -80,6 +99,7 @@ class AuthenticatedSession:
         return response
 
     def _post_query_with_token_retry(self, payload: Dict[str, Any]) -> requests.Response:
+        """POST a status query with the same 401 → re-auth → retry behaviour as scans."""
         response = self.session.post(config.QUERY_URL, json=payload, timeout=10.0)
         if response.status_code == 401:
             logger.warning("Query: 401. Re-authenticating...")
@@ -90,7 +110,16 @@ class AuthenticatedSession:
     def send_scan(
         self, card_uid: str, client_local_time_iso: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
-        """Posts a punch scan. Server assigns check-in vs check-out from history."""
+        """
+        Send one badge read to the server; the API decides check-in vs check-out from history.
+
+        Args:
+            card_uid: Raw UID from the reader (always sent as a string in JSON).
+            client_local_time_iso: Optional terminal clock string for the server log’s optional field.
+
+        Returns:
+            Parsed JSON dict on success, or ``None`` if auth or transport failed.
+        """
         uid = str(card_uid).strip()
         payload: Dict[str, Any] = {"device_id": config.DEVICE_ID, "uid": uid}
         if client_local_time_iso:
@@ -119,7 +148,16 @@ class AuthenticatedSession:
             return None
 
     def send_status_query(self, card_uid: str, query_kind: str = "status") -> Optional[Dict[str, Any]]:
-        """Read-only: status / flextime / holiday UI — does not record a punch."""
+        """
+        Ask the server for status text (and optional HR placeholders) **without** recording a punch.
+
+        Args:
+            card_uid: Badge UID.
+            query_kind: ``status`` | ``flextime`` | ``holiday`` — only the wording changes server-side.
+
+        Returns:
+            JSON dict on success, ``None`` on failure.
+        """
         uid = str(card_uid).strip()
         payload: Dict[str, Any] = {
             "device_id": config.DEVICE_ID,
@@ -144,7 +182,12 @@ class AuthenticatedSession:
             return None
 
     def send_heartbeat(self) -> bool:
-        """Lightweight POST so the server can mark the device as recently connected."""
+        """
+        Ping the server so ``last_seen`` updates and the dashboard can show the terminal as online.
+
+        Returns:
+            ``True`` if any accepted HTTP status was returned after optional re-auth.
+        """
         if not self.jwt_token:
             if not self.authenticate():
                 return False
