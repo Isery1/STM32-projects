@@ -1,0 +1,14 @@
+# Secrets & local config (use .env.example as a template)
+.env
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Runtime / debug
+app_debug.log
+*.log

@@ -1137,3 +1137,159 @@ a:hover { color: var(--clr-gold-light); }
 
 body.lang-de .lang-en { display: none !important; }
 body.lang-en .lang-de { display: none !important; }
+
+/* ============================================================
+   PROTOTYPE STYLES FOR PORTFOLIO REDESIGN OPTIONS
+   ============================================================ */
+
+.proto-section {
+  padding: 80px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.proto-header {
+  text-align: center;
+  margin-bottom: 40px;
+  background: var(--clr-gold-dark);
+  display: inline-block;
+  padding: 5px 20px;
+  color: white;
+  font-size: 0.9rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  border-radius: 20px;
+  margin-left: 50%;
+  transform: translateX(-50%);
+}
+
+/* IDEE 1: Mosaik CSS Grid */
+.mosaic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-auto-rows: 280px;
+  gap: 20px;
+  grid-auto-flow: dense;
+}
+
+.mosaic-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.mosaic-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.8s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+.mosaic-item:hover img {
+  transform: scale(1.05);
+}
+
+.mosaic-v { grid-row: span 2; }
+.mosaic-h { grid-column: span 2; }
+.mosaic-lg { grid-column: span 2; grid-row: span 2; }
+
+@media (max-width: 768px) {
+  .mosaic-h, .mosaic-lg { grid-column: span 1; }
+}
+
+/* IDEE 2: Cinematischer Slider */
+.slider-container {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.slider-track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  gap: 24px;
+  padding: 20px 10vw; /* Bleed padding */
+  scrollbar-width: none; /* Firefox */
+}
+
+.slider-track::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
+}
+
+.slider-item {
+  flex: 0 0 80vw;
+  height: 65vh;
+  scroll-snap-align: center;
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.4);
+}
+
+.slider-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.9);
+  transition: transform 1s;
+}
+
+.slider-item:hover img {
+  transform: scale(1.03);
+  filter: brightness(1);
+}
+
+/* IDEE 3: Lookbook Split Layout */
+.lookbook-container {
+  display: flex;
+  gap: 40px;
+  min-height: 150vh;
+  position: relative;
+}
+
+.lookbook-sticky {
+  flex: 1;
+  height: calc(100vh - 100px);
+  position: sticky;
+  top: 90px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.lookbook-sticky img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lookbook-scroll {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.lookbook-scroll-item {
+  height: 450px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.lookbook-scroll-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (max-width: 992px) {
+  .lookbook-container {
+    flex-direction: column;
+  }
+  .lookbook-sticky {
+    position: relative;
+    height: 500px;
+    top: 0;
+  }
+}

@@ -182,34 +182,82 @@
     </div>
   </section>
 
-  <!-- ========== GALLERY ========== -->
-  <section class="section gallery" id="gallery">
+  <!-- ========== PROTOTYPE IDEA 1: MOSAIK ========== -->
+  <section class="proto-section" id="idea1">
     <div class="container">
-      <div class="section-header reveal">
-        <p class="section-label">Portfolio</p>
-        <h2 class="section-title lang-de">Ausgewählte <em>Arbeiten</em></h2>
-        <h2 class="section-title lang-en">Selected <em>Works</em></h2>
+      <div class="proto-header">Idee 1: Vertikales Mosaik</div>
+      <div class="section-header">
+        <h2 class="section-title">Selected <em>Highlights</em></h2>
+        <div class="section-divider"></div>
+      </div>
+      
+      <div class="mosaic-grid">
+        <div class="mosaic-item mosaic-lg">
+          <img src="Fotos/Daniel & Tami Hochzeit/thumbnails/IMG_5615.JPG" alt="Wedding Focus">
+        </div>
+        <div class="mosaic-item">
+          <img src="Fotos/Wildlife & Nature/thumbnails/IMG_4386.JPG" alt="Nature">
+        </div>
+        <div class="mosaic-item mosaic-v">
+          <img src="Fotos/Daniel & Tamari Baby/thumbnails/1-IMG_6908.jpg" alt="Portrait Tall">
+        </div>
+        <div class="mosaic-item">
+          <img src="Fotos/Wildlife & Nature/thumbnails/IMG_4565.JPG" alt="Wildlife">
+        </div>
+        <div class="mosaic-item mosaic-h">
+          <img src="Fotos/Wildlife & Nature/thumbnails/IMG_6587.JPG" alt="Landscape Wide">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== PROTOTYPE IDEA 2: CINEMATIC SLIDER ========== -->
+  <section class="proto-section" id="idea2" style="background: #0a0a0a; padding-bottom: 100px;">
+    <div class="proto-header">Idee 2: Cinematischer Slider</div>
+    <div class="section-header container">
+      <h2 class="section-title">Cinematic <em>Experience</em></h2>
+      <div class="section-divider"></div>
+    </div>
+
+    <div class="slider-container">
+      <div class="slider-track">
+        <div class="slider-item">
+          <img src="Fotos/Wildlife & Nature/IMG_6587.JPG" alt="Wildlife Cinematic">
+        </div>
+        <div class="slider-item">
+          <img src="Fotos/Daniel & Tami Hochzeit/IMG_5615.JPG" alt="Wedding Cinematic">
+        </div>
+        <div class="slider-item">
+          <img src="Fotos/Daniel & Tamari Baby/IMG_7145.jpg" alt="Baby Cinematic" onerror="this.src='Fotos/Daniel & Tamari Baby/28-IMG_7145.jpg'">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== PROTOTYPE IDEA 3: LOOKBOOK ========== -->
+  <section class="proto-section" id="idea3">
+    <div class="container">
+      <div class="proto-header">Idee 3: Interaktives Lookbook</div>
+      <div class="section-header">
+        <h2 class="section-title">Interactive <em>Lookbook</em></h2>
         <div class="section-divider"></div>
       </div>
 
-      <!-- Category Filter -->
-      <div class="gallery__filters reveal">
-        <button class="gallery__filter active" data-filter="all">
-          <span class="lang-de">Alle</span>
-          <span class="lang-en">All</span>
-        </button>
-        <button class="gallery__filter" data-filter="portrait">
-          <span class="lang-de">Portraits & Momente</span>
-          <span class="lang-en">Portraits & Moments</span>
-        </button>
-        <button class="gallery__filter" data-filter="wildlife">
-          <span class="lang-de">Wildlife & Natur</span>
-          <span class="lang-en">Wildlife & Nature</span>
-        </button>
-      </div>
-
-      <div class="gallery__grid" id="galleryGrid">
-        <!-- Images populated by JS -->
+      <div class="lookbook-container">
+        <div class="lookbook-sticky">
+          <img src="Fotos/Daniel & Tami Hochzeit/IMG_5617.jpg" alt="Main Feature">
+        </div>
+        <div class="lookbook-scroll">
+          <div class="lookbook-scroll-item">
+            <img src="Fotos/Wildlife & Nature/thumbnails/IMG_5752.JPG" alt="Detail 1">
+          </div>
+          <div class="lookbook-scroll-item">
+            <img src="Fotos/Wildlife & Nature/thumbnails/IMG_6099.JPG" alt="Detail 2">
+          </div>
+          <div class="lookbook-scroll-item">
+            <img src="Fotos/Michael & Barbara/thumbnails/IMG_4926.JPG" alt="Detail 3">
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -798,7 +846,10 @@
     setInterval(nextSlide, 5000); // Cycle every 5 seconds
 
     // --- Initial render ---
-    renderGallery('all');
+    const gridElement = document.getElementById('galleryGrid');
+    if (gridElement) {
+      renderGallery('all');
+    }
   </script>
 
 </body>
