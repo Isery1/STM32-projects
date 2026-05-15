@@ -1,26 +1,8 @@
-# STM32CubeIDE / Eclipse
-.metadata/
-**/Debug/
-**/Release/
-**/.settings/
-*.log
-*.map
-*.elf
-*.hex
-*.bin
-*.d
-*.o
-*.su
-*.crf
-*.htm
-*.dep
-*.lnp
-*.sct
-*.lst
-*.txt
-*.obj
-*.i
-*.axf
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
 
-# AD5940 examples clone (files copied into Core/ directly)
-Impedance/ad5940-examples/
+# Local tooling (if used at repo root)
+.metadata/
