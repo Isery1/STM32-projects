@@ -20,6 +20,25 @@ from auth import AuthenticatedSession
 
 FONT_FAMILY = "Helvetica"
 
+# Fixed kiosk resolution (7" panels are often 800x480).
+DISPLAY_W, DISPLAY_H = 800, 480
+PAD_X = 16
+PAD_Y = 8
+FONT_CLOCK = 50
+FONT_DATE = 13
+FONT_INSTRUCTION = 15
+FONT_HEADER_TITLE = 13
+FONT_HEADER_STATUS = 10
+FONT_OVERLAY_TITLE = 22
+FONT_OVERLAY_BODY = 13
+FONT_BOOT_TITLE = 20
+FONT_BOOT_STEP = 14
+FONT_BOOT_DETAIL = 12
+FONT_BUTTON = 11
+OVERLAY_WRAP = 720
+FOOTER_PAYOUTSIDE = 12
+FOOTER_PADBOTTOM = 14
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -70,8 +89,10 @@ class KioskApp(tk.Tk):
         """
         super().__init__()
 
-        self.title("RFID Time Terminal Kiosk")
-        self.geometry("800x480")
+        self.title("Time clock")
+        self.geometry(f"{DISPLAY_W}x{DISPLAY_H}")
+        self.minsize(DISPLAY_W, DISPLAY_H)
+        self.maxsize(DISPLAY_W, DISPLAY_H)
         self.resizable(False, False)
         self.configure(bg="#121826")
         self._closing = False
@@ -104,51 +125,51 @@ class KioskApp(tk.Tk):
     def _build_boot_screen(self):
         """Lay out the pre-flight checklist labels before hardware and network are touched."""
         wrap = tk.Frame(self, bg=self.COLORS["bg"])
-        wrap.pack(expand=True, fill="both", padx=40, pady=36)
+        wrap.pack(expand=True, fill="both", padx=PAD_X * 2, pady=PAD_Y * 3)
         self._boot_wrap = wrap
 
         tk.Label(
             wrap,
-            text="Starting system",
-            font=(FONT_FAMILY, 26, "bold"),
+            text="Starting…",
+            font=(FONT_FAMILY, FONT_BOOT_TITLE, "bold"),
             bg=self.COLORS["bg"],
             fg=self.COLORS["text"],
-        ).pack(pady=(0, 8))
+        ).pack(pady=(0, 4))
 
         self._boot_subtitle = tk.Label(
             wrap,
-            text="Running startup checks…",
-            font=(FONT_FAMILY, 14),
+            text="A quick check before the clock appears.",
+            font=(FONT_FAMILY, FONT_BOOT_DETAIL),
             bg=self.COLORS["bg"],
             fg=self.COLORS["subtext"],
         )
-        self._boot_subtitle.pack(pady=(0, 20))
+        self._boot_subtitle.pack(pady=(0, 16))
 
         rows = [
-            ("hardware", "1. RFID reader & GPIO"),
-            ("network", "2. Network (LAN & Wi‑Fi)"),
-            ("server", "3. Time server (auth endpoint)"),
+            ("hardware", "RFID reader"),
+            ("network", "Network"),
+            ("server", "Time server"),
         ]
         for key, title in rows:
             row = tk.Frame(wrap, bg=self.COLORS["bg"])
-            row.pack(fill="x", pady=10)
+            row.pack(fill="x", pady=6)
             tk.Label(
                 row,
                 text=title,
-                font=(FONT_FAMILY, 15, "bold"),
+                font=(FONT_FAMILY, FONT_BOOT_STEP, "bold"),
                 anchor="w",
                 bg=self.COLORS["bg"],
                 fg=self.COLORS["text"],
             ).pack(fill="x")
             lbl = tk.Label(
                 row,
-                text="…",
-                font=(FONT_FAMILY, 13),
+                text="Waiting…",
+                font=(FONT_FAMILY, FONT_BOOT_DETAIL),
                 anchor="w",
                 bg=self.COLORS["bg"],
                 fg=self.COLORS["subtext"],
             )
-            lbl.pack(fill="x", padx=(18, 0))
+            lbl.pack(fill="x", padx=(14, 0))
             self._boot_detail_labels[key] = lbl
 
     def _kickoff_boot_sequence(self):
@@ -181,21 +202,21 @@ class KioskApp(tk.Tk):
         lbl = self._boot_detail_labels.get(phase)
         if lbl:
             if state == "running":
-                lbl.config(text="In progress…", fg=self.COLORS["warning"])
+                lbl.config(text="Checking…", fg=self.COLORS["warning"])
             elif state == "skip":
-                lbl.config(text=detail or "Skipped.", fg=self.COLORS["subtext"])
+                lbl.config(text=detail or "Not needed on this setup.", fg=self.COLORS["subtext"])
             elif state == "ok":
                 lbl.config(text=detail or "OK", fg=self.COLORS["success"])
             elif state == "error":
-                lbl.config(text=detail or "Failed", fg=self.COLORS["error"])
+                lbl.config(text=detail or "Something went wrong.", fg=self.COLORS["error"])
             else:
                 lbl.config(text=detail or state, fg=self.COLORS["subtext"])
         if self._boot_subtitle:
             subtitle = {
-                "hardware": "Checking RFID hardware…",
-                "network": "Checking LAN / Wi‑Fi and internet…",
-                "server": "Checking time server…",
-            }.get(phase, "Startup…")
+                "hardware": "Reader and wiring",
+                "network": "This device online",
+                "server": "Reaching the time server",
+            }.get(phase, "One moment…")
             self._boot_subtitle.config(text=subtitle, fg=self.COLORS["subtext"])
 
     def _boot_sequence_ok(self):
@@ -204,7 +225,7 @@ class KioskApp(tk.Tk):
             return
         if self._boot_subtitle:
             self._boot_subtitle.config(
-                text="All checks passed — loading terminal…",
+                text="All good — opening the clock.",
                 fg=self.COLORS["success"],
             )
         self.after(350, self._finalize_boot_transition)
@@ -228,25 +249,27 @@ class KioskApp(tk.Tk):
             msg = f"[{code}] {msg}"
         if self._boot_subtitle:
             self._boot_subtitle.config(
-                text="Startup failed — fix the issue and restart",
+                text="Startup stopped — this needs a fix",
                 fg=self.COLORS["error"],
             )
         tk.Label(
             self._boot_wrap,
             text=msg,
-            font=(FONT_FAMILY, 12),
-            wraplength=680,
+            font=(FONT_FAMILY, FONT_BOOT_DETAIL),
+            wraplength=OVERLAY_WRAP,
             justify="left",
             bg=self.COLORS["bg"],
             fg=self.COLORS["error"],
-        ).pack(pady=(24, 0))
+        ).pack(pady=(16, 0), anchor="w")
         tk.Label(
             self._boot_wrap,
-            text="Close this window, fix the problem, then start the app again.",
-            font=(FONT_FAMILY, 11),
+            text="Close this window after fixing the issue, then start the app again.",
+            font=(FONT_FAMILY, FONT_BOOT_DETAIL - 1),
+            wraplength=OVERLAY_WRAP,
+            justify="left",
             bg=self.COLORS["bg"],
             fg=self.COLORS["subtext"],
-        ).pack(pady=(8, 0))
+        ).pack(pady=(8, 0), anchor="w")
 
     def _complete_initialization_after_boot(self):
         """Wire session + reader, build widgets, and spawn the RFID polling thread."""
@@ -289,13 +312,13 @@ class KioskApp(tk.Tk):
         self.style.theme_use("clam")
         self.style.configure(
             "Kiosk.TButton",
-            font=(FONT_FAMILY, 13, "bold"),
+            font=(FONT_FAMILY, FONT_BUTTON, "bold"),
             background=self.COLORS["card"],
             foreground=self.COLORS["text"],
             borderwidth=0,
             focuscolor="none",
             relief="flat",
-            padding=15,
+            padding=(12, 10),
         )
         self.style.map(
             "Kiosk.TButton",
@@ -305,20 +328,31 @@ class KioskApp(tk.Tk):
 
     def build_ui_frames(self):
         """Create header/body/footer structure, clock labels, overlay region, and footer buttons."""
-        self.header = tk.Frame(self, bg=self.COLORS["bg"], height=60)
-        self.header.pack(side="top", fill="x", padx=20, pady=10)
+        self.header = tk.Frame(self, bg=self.COLORS["bg"])
+        self.header.pack(side="top", fill="x", padx=PAD_X, pady=(PAD_Y, 4))
+
+        hdr_inner = tk.Frame(self.header, bg=self.COLORS["bg"])
+        hdr_inner.pack(fill="x")
+
+        tk.Label(
+            hdr_inner,
+            text="Time clock",
+            font=(FONT_FAMILY, FONT_HEADER_TITLE, "bold"),
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["text"],
+        ).pack(side="left")
 
         self.status_beacon = tk.Label(
-            self.header,
-            text="● CONNECTING…",
-            font=(FONT_FAMILY, 9, "bold"),
+            hdr_inner,
+            text="● Connecting…",
+            font=(FONT_FAMILY, FONT_HEADER_STATUS, "bold"),
             bg=self.COLORS["bg"],
             fg=self.COLORS["warning"],
         )
-        self.status_beacon.pack(side="left")
+        self.status_beacon.pack(side="right")
 
         self.body = tk.Frame(self, bg=self.COLORS["bg"])
-        self.body.pack(expand=True, fill="both", padx=30)
+        self.body.pack(expand=True, fill="both", padx=PAD_X, pady=0)
 
         self.rest_frame = tk.Frame(self.body, bg=self.COLORS["bg"])
         self.rest_frame.pack(expand=True, fill="both")
@@ -326,73 +360,82 @@ class KioskApp(tk.Tk):
         self.lbl_time = tk.Label(
             self.rest_frame,
             text="12:00:00",
-            font=(FONT_FAMILY, 64, "bold"),
+            font=(FONT_FAMILY, FONT_CLOCK, "bold"),
             bg=self.COLORS["bg"],
             fg=self.COLORS["text"],
         )
-        self.lbl_time.pack(pady=(20, 0))
+        self.lbl_time.pack(pady=(8, 0))
 
         self.lbl_date = tk.Label(
             self.rest_frame,
             text="Friday, 15. May 2026",
-            font=(FONT_FAMILY, 16),
+            font=(FONT_FAMILY, FONT_DATE),
             bg=self.COLORS["bg"],
             fg=self.COLORS["subtext"],
         )
-        self.lbl_date.pack(pady=(0, 30))
+        self.lbl_date.pack(pady=(2, 12))
 
         self.lbl_instruction = tk.Label(
             self.rest_frame,
-            text="👋 Tap Card to Clock In / Out",
-            font=(FONT_FAMILY, 18, "bold"),
+            text="Hold your badge on the reader to clock in or out.",
+            font=(FONT_FAMILY, FONT_INSTRUCTION),
+            wraplength=OVERLAY_WRAP,
+            justify="center",
             bg=self.COLORS["bg"],
             fg=self.COLORS["accent"],
         )
-        self.lbl_instruction.pack(pady=10)
+        self.lbl_instruction.pack(pady=(4, 8))
 
         self.overlay_frame = tk.Frame(self, bg=self.COLORS["bg"])
+        self.overlay_inner = tk.Frame(self.overlay_frame, bg=self.COLORS["bg"])
+        self.overlay_inner.pack(expand=True, fill="both", padx=PAD_X, pady=PAD_Y)
 
         self.lbl_overlay_title = tk.Label(
-            self.overlay_frame,
-            text="Waiting...",
-            font=(FONT_FAMILY, 28, "bold"),
+            self.overlay_inner,
+            text="…",
+            font=(FONT_FAMILY, FONT_OVERLAY_TITLE, "bold"),
             bg=self.COLORS["bg"],
             fg="#ffffff",
+            wraplength=OVERLAY_WRAP,
+            justify="center",
         )
-        self.lbl_overlay_title.pack(expand=True, pady=(40, 10))
+        self.lbl_overlay_title.pack(pady=(24, 8))
 
         self.lbl_overlay_details = tk.Label(
-            self.overlay_frame,
-            text="Please scan your badge now.",
-            font=(FONT_FAMILY, 16),
+            self.overlay_inner,
+            text="",
+            font=(FONT_FAMILY, FONT_OVERLAY_BODY),
             bg=self.COLORS["bg"],
             fg=self.COLORS["subtext"],
+            wraplength=OVERLAY_WRAP,
+            justify="center",
         )
-        self.lbl_overlay_details.pack(expand=True, pady=(0, 40))
+        self.lbl_overlay_details.pack(pady=(0, 16))
 
-        self.footer = tk.Frame(self, bg=self.COLORS["bg"], height=100)
-        self.footer.pack(side="bottom", fill="x", padx=30, pady=(0, 30))
+        self.footer = tk.Frame(self, bg=self.COLORS["bg"])
+        self.footer.pack(side="bottom", fill="x", padx=FOOTER_PAYOUTSIDE, pady=(4, FOOTER_PADBOTTOM))
 
+        btn_pad = 6
         ttk.Button(
             self.footer,
-            text="🕒 State Info",
+            text="My status",
             style="Kiosk.TButton",
             command=lambda: self.action_button_clicked("CHECK_STATUS"),
-        ).pack(side="left", expand=True, padx=10, fill="x")
+        ).pack(side="left", expand=True, padx=(0, btn_pad), fill="x")
 
         ttk.Button(
             self.footer,
-            text="⚡ Flextime",
+            text="Flextime",
             style="Kiosk.TButton",
             command=lambda: self.action_button_clicked("FLEXTIME"),
-        ).pack(side="left", expand=True, padx=10, fill="x")
+        ).pack(side="left", expand=True, padx=(0, btn_pad), fill="x")
 
         ttk.Button(
             self.footer,
-            text="🌴 Holidays",
+            text="Holidays",
             style="Kiosk.TButton",
             command=lambda: self.action_button_clicked("HOLIDAY"),
-        ).pack(side="left", expand=True, padx=10, fill="x")
+        ).pack(side="left", expand=True, padx=(0, 0), fill="x")
 
         # Dev-only: click instruction to simulate a tap (still uploads to server)
         self.lbl_instruction.bind("<Button-1>", lambda e: self._on_card_uid("MOCK_CLICK_001"))
@@ -403,12 +446,12 @@ class KioskApp(tk.Tk):
             return
         if self.api_session.is_approved:
             self.status_beacon.config(
-                text="● SERVER ONLINE",
+                text="● Online",
                 fg=self.COLORS["success"],
             )
         else:
             self.status_beacon.config(
-                text="● SERVER OFFLINE / AUTH…",
+                text="● Connecting…",
                 fg=self.COLORS["warning"],
             )
         self.after(2000, self._poll_auth_beacon)
@@ -460,11 +503,11 @@ class KioskApp(tk.Tk):
             self.after_cancel(self.timeout_timer)
             self.timeout_timer = None
 
-        self.lbl_overlay_title.config(text="⏳ Sending…", fg=self.COLORS["accent"])
+        self.lbl_overlay_title.config(text="One moment…", fg=self.COLORS["accent"])
         self.lbl_overlay_details.config(
-            text=f"UID: {uid}\nPosting to server…",
+            text=f"We’re sending this to the server.\n\nBadge: {uid}",
             fg=self.COLORS["subtext"],
-            font=(FONT_FAMILY, 16),
+            font=(FONT_FAMILY, FONT_OVERLAY_BODY),
         )
         self.rest_frame.pack_forget()
         self.overlay_frame.pack(expand=True, fill="both")
@@ -503,46 +546,53 @@ class KioskApp(tk.Tk):
 
         if ok and pending_context:
             title = {
-                "CHECK_STATUS": "📋 Your status",
-                "FLEXTIME": "⚡ Flextime (preview)",
-                "HOLIDAY": "🌴 Holidays (preview)",
-            }.get(pending_context, "Info")
+                "CHECK_STATUS": "Your status",
+                "FLEXTIME": "Flextime",
+                "HOLIDAY": "Holidays & time off",
+            }.get(pending_context, "Information")
             color = self.COLORS["accent"]
-            details = terminal_msg or "No message from server."
+            details = terminal_msg or "Nothing else from the server right now."
         elif ok:
             if ev == "in":
-                punch_line = "CHECK IN recorded."
-                title_base = "🟢 CHECK IN"
+                punch_line = "You are checked in."
+                title_base = "Checked in"
             elif ev == "out":
-                punch_line = "CHECK OUT recorded."
-                title_base = "🔴 CHECK OUT"
+                punch_line = "You are checked out."
+                title_base = "Checked out"
             else:
-                punch_line = "Punch saved."
-                title_base = "✓ PUNCH SAVED"
+                punch_line = "Your time was recorded."
+                title_base = "Recorded"
 
             srv_t = (result or {}).get("server_time", "")
             loc_t = (result or {}).get("client_local_time", "")
-            time_bits = f"Server: {srv_t}" if srv_t else ""
+            time_bits = ""
+            if srv_t:
+                time_bits = f"Server time: {srv_t}"
             if loc_t:
-                time_bits += f"\nTerminal clock: {loc_t}" if time_bits else f"Terminal: {loc_t}"
+                time_bits = f"{time_bits}\nClock on device: {loc_t}" if time_bits else f"Clock on device: {loc_t}"
 
-            primary = terminal_msg or f"{title_base}\n{punch_line}"
+            headline = terminal_msg or punch_line
             color = self.COLORS["success"] if ev == "in" else (self.COLORS["error"] if ev == "out" else self.COLORS["success"])
             title = title_base
-            details = f"{primary}\n\nUID: {uid}\n{time_bits}\nDevice: {config.DEVICE_ID}"
+            details = f"{headline}\n\nBadge: {uid}"
+            if time_bits:
+                details = f"{details}\n{time_bits}"
+            details = f"{details}\nTerminal: {config.DEVICE_ID}"
         else:
-            title = "✗ REQUEST FAILED"
+            title = "Couldn’t complete that"
             color = self.COLORS["error"]
             details = (
-                f"UID: {uid}\nCould not reach server or request rejected.\n"
-                f"Check network and DEVICE_SECRET."
+                f"We couldn’t confirm this with the server.\n\n"
+                f"Badge: {uid}\n\n"
+                f"Check network cables or Wi‑Fi, then try again. "
+                f"If it keeps happening, check the device password (DEVICE_SECRET) in your .env file."
             )
 
         self.lbl_overlay_title.config(text=title, fg=color)
         self.lbl_overlay_details.config(
             text=details,
             fg="#ffffff",
-            font=(FONT_FAMILY, 16),
+            font=(FONT_FAMILY, FONT_OVERLAY_BODY),
         )
         self.timeout_timer = self.after(4000, self.revert_to_rest)
 
@@ -557,18 +607,21 @@ class KioskApp(tk.Tk):
         self.active_action = action_type
 
         titles = {
-            "CHECK_STATUS": "🔍 Current Account State",
-            "FLEXTIME": "⚡ View Flextime Balance",
-            "HOLIDAY": "🌴 Query Vacation Balances",
+            "CHECK_STATUS": "My status",
+            "FLEXTIME": "Flextime",
+            "HOLIDAY": "Holidays",
         }
         self.lbl_overlay_title.config(
-            text=titles.get(action_type, "Checking…"),
+            text=titles.get(action_type, "Next step"),
             fg=self.COLORS["accent"],
         )
         self.lbl_overlay_details.config(
-            text="TAP YOUR BADGE ON THE READER\n(Cancels automatically in 10s)",
+            text=(
+                "Hold your badge on the reader.\n\n"
+                "This screen closes in about 10 seconds if no badge is read."
+            ),
             fg=self.COLORS["subtext"],
-            font=(FONT_FAMILY, 16),
+            font=(FONT_FAMILY, FONT_OVERLAY_BODY),
         )
         self.rest_frame.pack_forget()
         self.overlay_frame.pack(expand=True, fill="both")

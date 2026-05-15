@@ -79,12 +79,29 @@ Headless (console only, no display UI):
 ```bash
 python3 main.py
 ```
-With local Tkinter kiosk (shows scan results and uploads each read to the server):
+With local Tkinter kiosk (layout targets a **800×480** panel; shows scan results and uploads each read):
 ```bash
 python3 main.py --gui
 # or: python3 gui_poc.py
 ```
 On the Pi desktop, ensure a display is available (e.g. `DISPLAY=:0` if started from SSH).
+
+### Kiosk autostart (desktop session)
+If the Pi boots into a graphical desktop, the usual pattern is a **`.desktop`** file under the user’s autostart folder, for example `~/.config/autostart/manageio-kiosk.desktop`, with `Exec=` pointing at `python3 …/main.py --gui` (and `env` / `PATH` as needed). A **systemd** unit is optional and only needed if you want the app to start **without** a logged-in desktop.
+
+### Hardware diagnostics (SSH / serial console)
+Bench checks for SPI and the MFRC522 (interactive: version read, then live tag UID loop):
+
+```bash
+cd RFID_Pi
+python3 boot_sequence.py --diagnose
+```
+
+For the same checks as startup **without** the GUI, run:
+
+```bash
+python3 boot_sequence.py
+```
 
 ---
 

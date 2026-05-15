@@ -5,6 +5,10 @@ Runs three steps in order: (1) RC522 SPI sanity via the version register, (2) Li
 plus a quick internet TCP probe, (3) reachability of the configured auth URL with a deliberate bad
 secret (expect HTTP 401). GUI mode can pass ``on_step`` to animate a splash screen.
 
+Interactive hardware test (version register + live tag loop, formerly ``test_hardware.py``)::
+
+    python boot_sequence.py --diagnose
+
 Environment:
     USE_MOCK_RFID — skip the hardware step (development / no reader).
     SKIP_BOOT_CHECKS — skip the entire sequence (recovery or CI).
@@ -12,10 +16,12 @@ Environment:
 
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 import socket
 import sys
+import time
 from typing import Callable, Dict, List, Optional, Tuple
 
 import requests
@@ -111,12 +117,36 @@ def _abort(code: int, msg: str, *, cli_exit: bool) -> None:
     raise BootCheckFailed(code, msg)
 
 
+def _rc522_version_summary(version: int) -> str:
+    """Short human label for the MFRC522 version register (for logs and kiosk boot line)."""
+    if version == 0x91:
+        return "NXP MFRC522 v1.0 — reader OK"
+    if version == 0x92:
+        return "NXP MFRC522 v2.0 — reader OK"
+    if version == 0x88:
+        return "Compatible MFRC522 — reader OK"
+    if version in (0x00, 0xFF):
+        return "No response (check SPI / solder / wiring)"
+    return f"Version 0x{version:02X} — unexpected; check wiring"
+
+
+def _rc522_comm_failure_help() -> str:
+    """Multi-line help for dead SPI reads (embedded in :exc:`RuntimeError` messages)."""
+    return (
+        "RC522 not responding (0x00/0xFF). Quick checks:\n"
+        "• Solder header pins — press-fit alone usually fails.\n"
+        "• Swap check: MOSI (pin 19) vs MISO (pin 21).\n"
+        "• SDA/SS → GPIO8 / CE0 (physical pin 24).\n"
+        "• Close other apps using SPI (only one process at a time)."
+    )
+
+
 def check_rc522_version_register(emit: OnStep = None) -> None:
     """
     Talk to the MFRC522 over SPI and read the version register (0x37).
 
     Raises:
-        RuntimeError: If the reader returns a dead pattern (0x00 / 0xFF).
+        RuntimeError: If the reader returns a dead pattern (0x00 / 0xFF), with troubleshooting text.
 
     Args:
         emit: Optional UI callback ``(phase, state, detail)`` for kiosk startup screens.
@@ -129,17 +159,74 @@ def check_rc522_version_register(emit: OnStep = None) -> None:
     reader = MFRC522()
     try:
         version = reader.Read_MFRC522(0x37)
-        logger.info("RC522 VersionReg (0x37): 0x%02X", version)
+        logger.info("RC522 VersionReg (0x37): 0x%02X — %s", version, _rc522_version_summary(version))
         if version in (0x00, 0xFF):
-            raise RuntimeError(
-                "RC522 not responding (0x00/0xFF). Check SPI wiring, soldering, and that no other process uses the reader."
-            )
+            raise RuntimeError(_rc522_comm_failure_help())
         if version not in (0x88, 0x91, 0x92):
             logger.warning("Unexpected VersionReg 0x%02X — SPI may be marginal; continuing.", version)
         if emit:
-            emit("hardware", "ok", f"Reader OK (version register 0x{version:02x})")
+            emit("hardware", "ok", _rc522_version_summary(version))
     finally:
         GPIO.cleanup()
+
+
+def run_interactive_hardware_diagnostics() -> None:
+    """
+    Console utility: print version interpretation, then loop reading tags (Ctrl+C to stop).
+
+    Replaces the former ``test_hardware.py`` script; keep for bench bring-up only.
+    """
+    try:
+        from mfrc522 import MFRC522
+        import RPi.GPIO as GPIO
+    except ImportError:
+        print("❌ ERROR: RPi.GPIO or mfrc522 library not installed!")
+        print("Run this on the Pi inside your project virtual environment.")
+        sys.exit(1)
+
+    print("\n" + "=" * 50)
+    print("RC522 RFID — hardware check & live tag test")
+    print("=" * 50)
+    print("[1/3] Initializing GPIO & SPI…")
+
+    try:
+        reader = MFRC522()
+        version = reader.Read_MFRC522(0x37)
+
+        print("\n[2/3] Version register 0x37 reads: 0x%02X" % version)
+        print("→", _rc522_version_summary(version))
+
+        if version in (0x00, 0xFF):
+            print("\n" + _rc522_comm_failure_help())
+            return
+
+        print("\n[3/3] Hold a card on the reader — printing UIDs (Ctrl+C to stop)…\n")
+
+        try:
+            last_scan_time = 0.0
+            while True:
+                (status, _tag_type) = reader.MFRC522_Request(reader.PICC_REQIDL)
+                if status == reader.MI_OK:
+                    now = time.time()
+                    if now - last_scan_time > 1.0:
+                        print("Tag detected — reading UID…")
+                        (status2, uid) = reader.MFRC522_Anticoll()
+                        if status2 == reader.MI_OK:
+                            formatted = "-".join(f"{x:02X}" for x in uid[:4])
+                            print("UID:", formatted)
+                            last_scan_time = now
+                        else:
+                            print("Anticollision failed (try again).")
+                time.sleep(0.1)
+        except KeyboardInterrupt:
+            print("\nStopped by user.")
+
+    except Exception as err:
+        print("\n❌ Error:", err)
+        print("If main.py or the kiosk is running, stop it first — only one process may use SPI.")
+    finally:
+        GPIO.cleanup()
+        print("GPIO cleaned up.\n")
 
 
 def _tcp_probe(host: str, port: int, timeout: float = 3.0) -> None:
@@ -290,3 +377,23 @@ def run_boot_checks(on_step: OnStep = None, *, cli_exit: bool = True) -> None:
         _abort(4, str(e), cli_exit=cli_exit)
 
     logger.info("Boot sequence completed successfully.")
+
+
+def _cli_main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Run boot checks from the shell, or --diagnose for interactive RC522 testing.",
+    )
+    parser.add_argument(
+        "--diagnose",
+        action="store_true",
+        help="Interactive RC522 test in this terminal (version register + live UID loop); for bench bring-up only.",
+    )
+    args = parser.parse_args()
+    if args.diagnose:
+        run_interactive_hardware_diagnostics()
+        return
+    run_boot_checks()
+
+
+if __name__ == "__main__":
+    _cli_main()

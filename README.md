@@ -10,7 +10,7 @@ Raspberry Pi RFID time client (`RFID_Pi/`) and PHP backend files for the web ser
 
 | Path | Description |
 |------|-------------|
-| `RFID_Pi/` | Python app: scanning, auth, kiosk GUI, boot checks, systemd unit |
+| `RFID_Pi/` | Python app: scanning, auth, kiosk GUI, boot checks |
 | `Website/rfid_api.php` | API, punch log, dashboard, JWT auth |
 | `Website/employees.json` | Optional badge UID → display name |
 
