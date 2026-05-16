@@ -1357,22 +1357,22 @@ class KioskApp(tk.Tk):
         scale.set(self.current_brightness)
         scale.pack(side="right", fill="x", expand=True, padx=(40, 10))
 
-        # 4. Network Info
-        net_row = tk.Frame(inner, bg="#131b2e", height=60)
-        net_row.pack(fill="x", pady=10, padx=20)
-        net_row.pack_propagate(False)
-        tk.Label(net_row, text=t["settings_network"], font=(FONT_FAMILY, 12, "bold"), bg="#131b2e", fg="#f8fafc").pack(side="left")
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            status = f"ONLINE ({ip})"
-            net_color = self.COLORS["success"]
-        except:
-            status = "OFFLINE"
-            net_color = self.COLORS["error"]
-        tk.Label(net_row, text=status, font=(FONT_FAMILY, 11), bg="#131b2e", fg=net_color).pack(side="right")
+        # 4. Network Info (expanded)
+        net_section_label = tk.Frame(inner, bg="#131b2e", height=30)
+        net_section_label.pack(fill="x", padx=20, pady=(14, 2))
+        net_section_label.pack_propagate(False)
+        tk.Label(net_section_label, text=t["settings_network"],
+                 font=(FONT_FAMILY, 12, "bold"), bg="#131b2e", fg="#f8fafc").pack(side="left")
+
+        net_info = self._get_network_info()
+        for label, value, color in net_info:
+            row = tk.Frame(inner, bg="#0f1929", height=44)
+            row.pack(fill="x", pady=2, padx=20)
+            row.pack_propagate(False)
+            tk.Label(row, text=label, font=(FONT_FAMILY, 10), bg="#0f1929",
+                     fg=self.COLORS["subtext"]).pack(side="left", padx=10)
+            tk.Label(row, text=value, font=(FONT_FAMILY, 10, "bold"), bg="#0f1929",
+                     fg=color).pack(side="right", padx=10)
 
         # 5. Save Button
         save_btn_row = tk.Frame(inner, bg="#131b2e", height=80)
@@ -1438,21 +1438,112 @@ class KioskApp(tk.Tk):
                    "30 Sekunden": 30000, "1 Minute": 60000, "5 Minuten": 300000, "Nie": 3600000}
         self.IDLE_TIMEOUT_MS = mapping.get(val, 60000)
 
-    def _update_brightness(self, val):
-        self.current_brightness = int(float(val))
+    def _get_network_info(self):
+        """Return list of (label, value, color) tuples describing current network state."""
+        rows = []
+        ok_c = self.COLORS["success"]
+        err_c = self.COLORS["error"]
+        sub_c = self.COLORS["subtext"]
+
+        # Internet connectivity + IP
         try:
-            # Try multiple common Pi backlight paths
-            paths = [
-                "/sys/class/backlight/rpi_backlight/brightness",
-                "/sys/class/backlight/soc:backlight/brightness"
-            ]
-            for p in paths:
-                if os.path.exists(p):
-                    with open(p, "w") as f:
-                        f.write(str(int(self.current_brightness * 2.55)))
-                    break
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(1)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            rows.append(("Status", "ONLINE", ok_c))
+            rows.append(("IP Address", ip, ok_c))
+        except:
+            rows.append(("Status", "OFFLINE", err_c))
+            rows.append(("IP Address", "—", sub_c))
+
+        # Hostname
+        try:
+            rows.append(("Hostname", socket.gethostname(), sub_c))
         except:
             pass
+
+        # Default gateway (Linux only)
+        try:
+            gw_out = subprocess.check_output(
+                ["ip", "route", "show", "default"], timeout=2, stderr=subprocess.DEVNULL
+            ).decode().strip()
+            # "default via 192.168.x.x dev wlan0"
+            parts = gw_out.split()
+            gw_ip = parts[2] if len(parts) > 2 else "—"
+            gw_iface = parts[4] if len(parts) > 4 else ""
+            rows.append(("Gateway", f"{gw_ip}  ({gw_iface})", sub_c))
+        except:
+            pass
+
+        # DNS
+        try:
+            with open("/etc/resolv.conf") as f:
+                for line in f:
+                    if line.startswith("nameserver"):
+                        rows.append(("DNS Server", line.split()[1], sub_c))
+                        break
+        except:
+            pass
+
+        # WiFi SSID
+        try:
+            ssid_out = subprocess.check_output(
+                ["iwgetid", "-r"], timeout=2, stderr=subprocess.DEVNULL
+            ).decode().strip()
+            if ssid_out:
+                rows.append(("WiFi SSID", ssid_out, sub_c))
+        except:
+            pass
+
+        # WiFi signal strength
+        try:
+            iwconfig_out = subprocess.check_output(
+                ["iwconfig"], timeout=2, stderr=subprocess.DEVNULL
+            ).decode()
+            for line in iwconfig_out.splitlines():
+                if "Signal level" in line:
+                    import re
+                    m = re.search(r"Signal level=(-\d+) dBm", line)
+                    if m:
+                        dbm = int(m.group(1))
+                        quality = "Excellent" if dbm > -50 else ("Good" if dbm > -65 else ("Fair" if dbm > -75 else "Weak"))
+                        rows.append(("Signal", f"{dbm} dBm  ({quality})", ok_c if dbm > -65 else self.COLORS["warning"]))
+                        break
+        except:
+            pass
+
+        return rows
+
+    def _update_brightness(self, val):
+        self.current_brightness = int(float(val))
+        level = str(int(self.current_brightness * 2.55))   # scale 0-100 -> 0-255
+        paths = [
+            "/sys/class/backlight/rpi_backlight/brightness",
+            "/sys/class/backlight/soc:backlight/brightness",
+        ]
+        for p in paths:
+            if os.path.exists(p):
+                # Try direct write first (works if running as root)
+                try:
+                    with open(p, "w") as f:
+                        f.write(level)
+                    break
+                except PermissionError:
+                    pass
+                # Fall back to: echo LEVEL | sudo tee /sys/...
+                # Requires the sudoers rule from install_sudoers.sh
+                try:
+                    subprocess.run(
+                        ["sudo", "tee", p],
+                        input=level.encode(),
+                        stdout=subprocess.DEVNULL,
+                        timeout=1,
+                    )
+                    break
+                except Exception:
+                    pass
 
     def _refresh_admin_page(self):
         """Reload local SQLite queue rows into the admin page."""
