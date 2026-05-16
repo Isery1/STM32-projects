@@ -20,13 +20,13 @@ import config
 from auth import AuthenticatedSession
 from offline_queue import OfflineScanQueue, local_now_iso
 
-FONT_FAMILY = "Helvetica"
+FONT_FAMILY = os.getenv("KIOSK_FONT_FAMILY", "Geist")
 
 # Fixed kiosk resolution (7" panels are often 800x480).
 DISPLAY_W, DISPLAY_H = 800, 480
 PAD_X = 12
 PAD_Y = 6
-FONT_CLOCK = 40
+FONT_CLOCK = 58
 FONT_DATE = 13
 FONT_INSTRUCTION = 15
 FONT_HEADER_TITLE = 13
@@ -42,6 +42,7 @@ FOOTER_PAYOUTSIDE = 12
 FOOTER_PADBOTTOM = 10
 BUTTON_RADIUS = 10
 IDLE_RETURN_MS = 60_000
+SIDEBAR_W = 82
 
 logging.basicConfig(
     level=logging.INFO,
@@ -143,6 +144,39 @@ class RoundedButton(tk.Canvas):
         self._draw(self.normal_bg)
 
 
+class RoundedPanel(tk.Canvas):
+    """Rounded panel with an embedded frame for child widgets."""
+
+    def __init__(self, parent, *, bg: str, border: str, radius: int = 18, width: int = 100, height: int = 100):
+        super().__init__(parent, width=width, height=height, bg=parent["bg"], highlightthickness=0, bd=0)
+        self.fill = bg
+        self.border = border
+        self.radius = radius
+        self.inner = tk.Frame(self, bg=bg)
+        self.window_id = self.create_window(0, 0, anchor="nw", window=self.inner)
+        self.bind("<Configure>", self._redraw)
+
+    def _redraw(self, _event=None):
+        self.delete("panel")
+        w = max(2, self.winfo_width())
+        h = max(2, self.winfo_height())
+        r = min(self.radius, w // 2, h // 2)
+        self.create_rectangle(r, 1, w - r, h - 1, fill=self.fill, outline=self.fill, tags="panel")
+        self.create_rectangle(1, r, w - 1, h - r, fill=self.fill, outline=self.fill, tags="panel")
+        self.create_arc(1, 1, 2 * r, 2 * r, start=90, extent=90, fill=self.fill, outline=self.fill, tags="panel")
+        self.create_arc(w - 2 * r, 1, w - 1, 2 * r, start=0, extent=90, fill=self.fill, outline=self.fill, tags="panel")
+        self.create_arc(w - 2 * r, h - 2 * r, w - 1, h - 1, start=270, extent=90, fill=self.fill, outline=self.fill, tags="panel")
+        self.create_arc(1, h - 2 * r, 2 * r, h - 1, start=180, extent=90, fill=self.fill, outline=self.fill, tags="panel")
+        self.create_line(r, 1, w - r, 1, fill=self.border, tags="panel")
+        self.create_line(w - 1, r, w - 1, h - r, fill=self.border, tags="panel")
+        self.create_line(w - r, h - 1, r, h - 1, fill=self.border, tags="panel")
+        self.create_line(1, h - r, 1, r, fill=self.border, tags="panel")
+        self.tag_lower("panel")
+        inset = max(8, r // 2)
+        self.coords(self.window_id, inset, inset)
+        self.itemconfigure(self.window_id, width=max(1, w - (inset * 2)), height=max(1, h - (inset * 2)))
+
+
 class KioskApp(tk.Tk):
     """Root Tk window: boot splash (optional) + idle clock UI + scan overlay + footer actions."""
 
@@ -171,22 +205,23 @@ class KioskApp(tk.Tk):
         self.defer_boot_sequence = defer_boot_sequence
 
         self.COLORS = {
-            "bg": "#0a0f1d",
-            "surface": "#111827",
-            "card": "#171126",
-            "card_2": "#21173a",
-            "border": "#33264d",
+            "bg": "#0b1326",
+            "sidebar": "#060e20",
+            "surface": "#0b1326",
+            "card": "#131b2e",
+            "card_2": "#202a42",
+            "border": "#31394d",
             "text": "#f8fafc",
-            "accent": "#4f46e5",
-            "accent_2": "#7c3aed",
-            "success": "#34d399",
+            "accent": "#7c3aed",
+            "accent_2": "#8b5cf6",
+            "success": "#10b981",
             "warning": "#fbbf24",
-            "subtext": "#c4b5d8",
-            "muted": "#8b7aa1",
+            "subtext": "#94a3b8",
+            "muted": "#64748b",
             "error": "#fb7185",
-            "button": "#6d28d9",
+            "button": "#7c3aed",
             "button_active": "#8b5cf6",
-            "button_alt": "#31204b",
+            "button_alt": "#1f2937",
         }
 
         self.create_styles()
@@ -365,6 +400,7 @@ class KioskApp(tk.Tk):
         self.admin_frame = None
         self.admin_summary_label = None
         self.user_panel_frame = None
+        self.nav_items = {}
         self.rfid_listener_active = True
         self._scan_ui_lock = threading.Lock()
         self._sync_lock = threading.Lock()
@@ -459,85 +495,148 @@ class KioskApp(tk.Tk):
 
     def build_ui_frames(self):
         """Create header/body/footer structure, clock labels, overlay region, and footer buttons."""
-        self.header = tk.Frame(self, bg=self.COLORS["surface"], highlightthickness=1, highlightbackground=self.COLORS["card_2"])
-        self.header.pack(side="top", fill="x", padx=PAD_X, pady=(PAD_Y, 2))
+        self.sidebar = tk.Frame(self, bg=self.COLORS["sidebar"], width=SIDEBAR_W)
+        self.sidebar.pack(side="left", fill="y")
+        self.sidebar.pack_propagate(False)
+
+        self._add_nav_item("home", "⌂", "Home", self.revert_to_rest, active=True)
+        self._add_nav_item("user", "♙", "User", self._open_user_panel)
+        self._add_nav_item("admin", "🛡", "Admin", lambda: self.action_button_clicked("ADMIN"))
+        tk.Frame(self.sidebar, bg=self.COLORS["sidebar"]).pack(expand=True, fill="both")
+        self._add_nav_item("settings", "⚙", "Settings", self._open_settings_info)
+
+        self.main_area = tk.Frame(self, bg=self.COLORS["bg"])
+        self.main_area.pack(side="right", fill="both", expand=True)
+
+        self.header = tk.Frame(self.main_area, bg=self.COLORS["surface"], highlightthickness=1, highlightbackground="#182036")
+        self.header.pack(side="top", fill="x")
 
         hdr_inner = tk.Frame(self.header, bg=self.COLORS["surface"])
-        hdr_inner.pack(fill="x", padx=10, pady=3)
+        hdr_inner.pack(fill="x", padx=18, pady=8)
 
-        self.status_beacon = tk.Label(
+        tk.Label(
             hdr_inner,
-            text="● Connecting…",
-            font=(FONT_FAMILY, FONT_HEADER_STATUS, "bold"),
+            text="manageIO",
+            font=(FONT_FAMILY, FONT_HEADER_TITLE, "bold"),
             bg=self.COLORS["surface"],
-            fg=self.COLORS["warning"],
+            fg="#d8b4fe",
+        ).pack(side="left")
+
+        status_wrap = tk.Frame(hdr_inner, bg="#131b2e", highlightthickness=1, highlightbackground=self.COLORS["border"])
+        status_wrap.pack(side="right")
+        self.status_beacon = tk.Label(
+            status_wrap,
+            text="● ONLINE",
+            font=(FONT_FAMILY, FONT_HEADER_STATUS, "bold"),
+            bg="#131b2e",
+            fg=self.COLORS["success"],
+            padx=10,
+            pady=3,
         )
-        self.status_beacon.pack(side="right")
+        self.status_beacon.pack()
 
-        self.body = tk.Frame(self, bg=self.COLORS["bg"])
-        self.body.pack(side="top", expand=True, fill="both", padx=PAD_X, pady=0)
+        self.body = tk.Frame(self.main_area, bg=self.COLORS["bg"])
+        self.body.pack(side="top", expand=True, fill="both", padx=20, pady=(12, 12))
 
-        self.rest_frame = tk.Frame(self.body, bg=self.COLORS["surface"], highlightthickness=1, highlightbackground=self.COLORS["card_2"])
+        self.rest_frame = tk.Frame(self.body, bg=self.COLORS["surface"])
         self.rest_frame.pack(expand=True, fill="both")
 
+        self.clock_frame = tk.Frame(self.rest_frame, bg=self.COLORS["surface"])
+        self.clock_frame.pack(fill="x", expand=True, pady=(48, 10))
+
         self.lbl_time = tk.Label(
-            self.rest_frame,
+            self.clock_frame,
             text="12:00:00",
-            font=(FONT_FAMILY, FONT_CLOCK, "bold"),
+            font=(FONT_FAMILY, FONT_CLOCK),
             bg=self.COLORS["surface"],
-            fg=self.COLORS["text"],
+            fg="#d8b4fe",
         )
-        self.lbl_time.pack(pady=(5, 0))
+        self.lbl_time.pack()
 
         self.lbl_date = tk.Label(
-            self.rest_frame,
-            text="Friday, 15. May 2026",
+            self.clock_frame,
+            text="SATURDAY, 16. MAY 2026",
             font=(FONT_FAMILY, FONT_DATE),
             bg=self.COLORS["surface"],
             fg=self.COLORS["subtext"],
         )
-        self.lbl_date.pack(pady=(0, 5))
+        self.lbl_date.pack(pady=(2, 0))
 
-        self.prompt_card = tk.Frame(
-            self.rest_frame,
+        self.action_row = tk.Frame(self.rest_frame, bg=self.COLORS["surface"])
+        self.action_row.pack(side="bottom", fill="x", pady=(0, 26))
+
+        self.prompt_panel = RoundedPanel(
+            self.action_row,
             bg=self.COLORS["card"],
-            highlightthickness=1,
-            highlightbackground=self.COLORS["accent_2"],
+            border=self.COLORS["border"],
+            width=300,
+            height=78,
         )
-        self.prompt_card.pack(fill="x", padx=30, pady=(0, 4))
+        self.prompt_panel.pack(side="left", padx=(0, 14))
+        self.prompt_card = self.prompt_panel.inner
+
+        badge_row = tk.Frame(self.prompt_card, bg=self.COLORS["card"])
+        badge_row.pack(fill="both", expand=True, padx=10, pady=8)
+
+        tk.Label(
+            badge_row,
+            text="▣",
+            font=(FONT_FAMILY, 17),
+            bg=self.COLORS["card_2"],
+            fg="#d8b4fe",
+            width=3,
+            height=2,
+        ).pack(side="left", padx=(0, 10))
+
+        badge_text = tk.Frame(badge_row, bg=self.COLORS["card"])
+        badge_text.pack(side="left", fill="both", expand=True)
 
         self.lbl_instruction = tk.Label(
-            self.prompt_card,
-            text="Hold your badge on the reader to clock in or out.",
-            font=(FONT_FAMILY, FONT_INSTRUCTION),
-            wraplength=680,
-            height=2,
-            justify="center",
+            badge_text,
+            text="Tap badge to clock in/out",
+            font=(FONT_FAMILY, FONT_INSTRUCTION - 2),
+            wraplength=220,
+            justify="left",
+            anchor="w",
             bg=self.COLORS["card"],
-            fg=self.COLORS["accent"],
+            fg=self.COLORS["text"],
         )
-        self.lbl_instruction.pack(fill="x", pady=(6, 1))
+        self.lbl_instruction.pack(fill="x", pady=(6, 0))
 
         self.lbl_queue_status = tk.Label(
-            self.prompt_card,
+            badge_text,
             text="Ready to record your time.",
-            font=(FONT_FAMILY, FONT_OVERLAY_BODY),
-            wraplength=680,
-            height=2,
-            justify="center",
+            font=(FONT_FAMILY, FONT_OVERLAY_BODY - 2),
+            wraplength=230,
+            justify="left",
+            anchor="w",
             bg=self.COLORS["card"],
             fg=self.COLORS["subtext"],
         )
-        self.lbl_queue_status.pack(fill="x", pady=(0, 6))
+        self.lbl_queue_status.pack(fill="x", pady=(2, 0))
 
-        self.overlay_frame = tk.Frame(self, bg=self.COLORS["bg"])
-        self.overlay_inner = tk.Frame(
+        RoundedButton(
+            self.action_row,
+            "ⓘ  Check my current status",
+            self._check_status_clicked,
+            width=315,
+            height=78,
+            bg=self.COLORS["accent"],
+            fg="#ffffff",
+            active_bg=self.COLORS["accent_2"],
+            border="#8b5cf6",
+            font=(FONT_FAMILY, FONT_BUTTON + 1),
+        ).pack(side="left")
+
+        self.overlay_frame = tk.Frame(self.body, bg=self.COLORS["bg"])
+        self.overlay_panel = RoundedPanel(
             self.overlay_frame,
             bg=self.COLORS["surface"],
-            highlightthickness=1,
-            highlightbackground=self.COLORS["card_2"],
+            border=self.COLORS["card_2"],
+            radius=18,
         )
-        self.overlay_inner.pack(expand=True, fill="both", padx=PAD_X, pady=PAD_Y * 2)
+        self.overlay_panel.pack(expand=True, fill="both", padx=PAD_X, pady=PAD_Y * 2)
+        self.overlay_inner = self.overlay_panel.inner
 
         self.lbl_overlay_title = tk.Label(
             self.overlay_inner,
@@ -575,53 +674,47 @@ class KioskApp(tk.Tk):
         )
         self.overlay_return.pack(pady=(6, 0))
 
-        self.footer = tk.Frame(self, bg=self.COLORS["bg"])
-        self.footer.pack(side="bottom", fill="x", padx=FOOTER_PAYOUTSIDE, pady=(1, FOOTER_PADBOTTOM))
-
-        self.footer_top = tk.Frame(self.footer, bg=self.COLORS["bg"])
-        self.footer_top.pack(fill="x", pady=(0, 4))
-
-        RoundedButton(
-            self.footer_top,
-            "User panel",
-            self._open_user_panel,
-            width=382,
-            height=40,
-            bg=self.COLORS["card"],
-            fg=self.COLORS["text"],
-            active_bg=self.COLORS["card_2"],
-            border=self.COLORS["border"],
-            font=(FONT_FAMILY, FONT_BUTTON + 2, "bold"),
-        ).pack(side="left", padx=(0, 6))
-
-        RoundedButton(
-            self.footer_top,
-            "Admin panel",
-            lambda: self.action_button_clicked("ADMIN"),
-            width=382,
-            height=40,
-            bg=self.COLORS["card"],
-            fg=self.COLORS["text"],
-            active_bg=self.COLORS["card_2"],
-            border=self.COLORS["border"],
-            font=(FONT_FAMILY, FONT_BUTTON + 2, "bold"),
-        ).pack(side="left", padx=(6, 0))
-
-        RoundedButton(
-            self.footer,
-            "Check my current status",
-            self._check_status_clicked,
-            width=776,
-            height=50,
-            bg=self.COLORS["accent"],
-            fg="#ffffff",
-            active_bg=self.COLORS["accent_2"],
-            border=self.COLORS["border"],
-            font=(FONT_FAMILY, FONT_BUTTON + 4, "bold"),
-        ).pack(expand=True, fill="x")
+        self.footer = tk.Frame(self.main_area, bg=self.COLORS["bg"])
 
         # Dev-only: click instruction to simulate a tap (still uploads to server)
         self.lbl_instruction.bind("<Button-1>", lambda e: self._on_card_uid("MOCK_CLICK_001"))
+
+    def _add_nav_item(self, key: str, icon: str, text: str, command, active: bool = False):
+        """Add one compact sidebar item."""
+        bg = self.COLORS["card_2"] if active else self.COLORS["sidebar"]
+        fg = self.COLORS["text"] if active else self.COLORS["subtext"]
+        item = tk.Frame(self.sidebar, bg=bg, cursor="hand2")
+        item.pack(fill="x", pady=(12, 0), ipady=8)
+        icon_label = tk.Label(
+            item,
+            text=icon,
+            font=(FONT_FAMILY, 18),
+            bg=bg,
+            fg=fg,
+            cursor="hand2",
+        )
+        icon_label.pack()
+        text_label = tk.Label(
+            item,
+            text=text,
+            font=(FONT_FAMILY, 8),
+            bg=bg,
+            fg=fg,
+            cursor="hand2",
+        )
+        text_label.pack()
+        for widget in (item, icon_label, text_label):
+            widget.bind("<Button-1>", lambda _event, cmd=command: cmd())
+        self.nav_items[key] = (item, icon_label, text_label)
+
+    def _set_nav_active(self, active_key: str):
+        """Highlight only the currently selected sidebar item."""
+        for key, widgets in self.nav_items.items():
+            is_active = key == active_key
+            bg = self.COLORS["card_2"] if is_active else self.COLORS["sidebar"]
+            fg = self.COLORS["text"] if is_active else self.COLORS["subtext"]
+            for widget in widgets:
+                widget.config(bg=bg, fg=fg) if isinstance(widget, tk.Label) else widget.config(bg=bg)
 
     def _check_status_clicked(self):
         """Open status badge prompt only when a server connection is available."""
@@ -634,6 +727,15 @@ class KioskApp(tk.Tk):
             return
         self.action_button_clicked("CHECK_STATUS")
 
+    def _open_settings_info(self):
+        """Placeholder settings screen from the sidebar."""
+        self._set_nav_active("settings")
+        self._show_info_screen(
+            "Settings",
+            "Settings will be available here later.",
+            self.COLORS["accent"],
+        )
+
     def _show_info_screen(self, title: str, details: str, color: str):
         """Show a returnable message screen with the same overlay design."""
         if self.timeout_timer:
@@ -645,7 +747,6 @@ class KioskApp(tk.Tk):
         if self.admin_frame is not None:
             self.admin_frame.destroy()
             self.admin_frame = None
-            self.footer.pack(side="bottom", fill="x", padx=FOOTER_PAYOUTSIDE, pady=(1, FOOTER_PADBOTTOM))
         self.rest_frame.pack_forget()
         self.current_state = "INFO"
         self.active_action = None
@@ -919,32 +1020,33 @@ class KioskApp(tk.Tk):
             self.timeout_timer = None
         self.current_state = "USER_PANEL"
         self.active_action = None
+        self._set_nav_active("user")
         if self.admin_frame is not None:
             self.admin_frame.destroy()
             self.admin_frame = None
-            self.footer.pack(side="bottom", fill="x", padx=FOOTER_PAYOUTSIDE, pady=(4, FOOTER_PADBOTTOM))
         self.overlay_frame.pack_forget()
         self.rest_frame.pack_forget()
         if self.user_panel_frame is not None:
             self.user_panel_frame.destroy()
 
-        self.user_panel_frame = tk.Frame(
+        self.user_panel_frame = RoundedPanel(
             self.body,
             bg=self.COLORS["surface"],
-            highlightthickness=1,
-            highlightbackground=self.COLORS["card_2"],
+            border=self.COLORS["card_2"],
+            radius=18,
         )
         self.user_panel_frame.pack(expand=True, fill="both")
+        user_panel = self.user_panel_frame.inner
 
         tk.Label(
-            self.user_panel_frame,
+            user_panel,
             text="What would you like to check?",
-            font=(FONT_FAMILY, FONT_OVERLAY_TITLE, "bold"),
+            font=(FONT_FAMILY, FONT_OVERLAY_TITLE),
             bg=self.COLORS["surface"],
             fg=self.COLORS["text"],
         ).pack(pady=(26, 6))
         tk.Label(
-            self.user_panel_frame,
+            user_panel,
             text=(
                 "Choose an option, then scan your badge."
                 if self.api_session.is_approved
@@ -956,7 +1058,7 @@ class KioskApp(tk.Tk):
         ).pack(pady=(0, 20))
 
         if self.api_session.is_approved:
-            choices = tk.Frame(self.user_panel_frame, bg=self.COLORS["surface"])
+            choices = tk.Frame(user_panel, bg=self.COLORS["surface"])
             choices.pack(fill="x", padx=36)
             RoundedButton(
                 choices,
@@ -984,7 +1086,7 @@ class KioskApp(tk.Tk):
             ).pack(side="left", expand=True, padx=(10, 0))
 
         RoundedButton(
-            self.user_panel_frame,
+            user_panel,
             "Return",
             self.revert_to_rest,
             width=300,
@@ -1004,24 +1106,31 @@ class KioskApp(tk.Tk):
             self.timeout_timer = None
         self.current_state = "ADMIN"
         self.active_action = None
+        self._set_nav_active("admin")
         if self.user_panel_frame is not None:
             self.user_panel_frame.destroy()
             self.user_panel_frame = None
         self.overlay_frame.pack_forget()
         self.rest_frame.pack_forget()
-        self.footer.pack_forget()
         if self.admin_frame is not None:
             self.admin_frame.destroy()
 
-        self.admin_frame = tk.Frame(self, bg=self.COLORS["bg"])
-        self.admin_frame.pack(expand=True, fill="both", padx=PAD_X, pady=(PAD_Y, FOOTER_PADBOTTOM))
+        self.admin_frame = tk.Frame(self.body, bg=self.COLORS["bg"])
+        self.admin_frame.pack(expand=True, fill="both")
 
-        header = tk.Frame(self.admin_frame, bg=self.COLORS["surface"], highlightthickness=1, highlightbackground=self.COLORS["card_2"])
-        header.pack(fill="x", pady=(0, 8))
+        header_panel = RoundedPanel(
+            self.admin_frame,
+            bg=self.COLORS["surface"],
+            border=self.COLORS["card_2"],
+            radius=16,
+            height=48,
+        )
+        header_panel.pack(fill="x", pady=(0, 8))
+        header = header_panel.inner
         tk.Label(
             header,
             text="Admin overview",
-            font=(FONT_FAMILY, FONT_HEADER_TITLE + 2, "bold"),
+            font=(FONT_FAMILY, FONT_HEADER_TITLE + 2),
             bg=self.COLORS["surface"],
             fg=self.COLORS["text"],
         ).pack(side="left", padx=10, pady=6)
@@ -1054,13 +1163,14 @@ class KioskApp(tk.Tk):
             fg=self.COLORS["text"],
         ).pack(fill="x")
 
-        self.admin_rows_frame = tk.Frame(
+        rows_panel = RoundedPanel(
             self.admin_frame,
             bg=self.COLORS["card"],
-            highlightthickness=1,
-            highlightbackground=self.COLORS["card_2"],
+            border=self.COLORS["card_2"],
+            radius=16,
         )
-        self.admin_rows_frame.pack(fill="both", expand=True, pady=(4, 8))
+        rows_panel.pack(fill="both", expand=True, pady=(4, 8))
+        self.admin_rows_frame = rows_panel.inner
 
         controls = tk.Frame(self.admin_frame, bg=self.COLORS["bg"])
         controls.pack(fill="x")
@@ -1148,7 +1258,6 @@ class KioskApp(tk.Tk):
         if self.user_panel_frame is not None:
             self.user_panel_frame.destroy()
             self.user_panel_frame = None
-        self.footer.pack(side="bottom", fill="x", padx=FOOTER_PAYOUTSIDE, pady=(4, FOOTER_PADBOTTOM))
         self.rest_frame.pack(expand=True, fill="both")
         self.current_state = "REST"
         self._update_connection_copy(self.scan_queue.pending_count())
@@ -1169,10 +1278,11 @@ class KioskApp(tk.Tk):
             return
         self.current_state = "WAITING_CARD"
         self.active_action = action_type
+        if action_type == "ADMIN":
+            self._set_nav_active("admin")
         if self.admin_frame is not None:
             self.admin_frame.destroy()
             self.admin_frame = None
-            self.footer.pack(side="bottom", fill="x", padx=FOOTER_PAYOUTSIDE, pady=(4, FOOTER_PADBOTTOM))
         if self.user_panel_frame is not None:
             self.user_panel_frame.destroy()
             self.user_panel_frame = None
@@ -1209,6 +1319,7 @@ class KioskApp(tk.Tk):
         """Hide overlay, show the clock screen again, and clear timers."""
         self.current_state = "REST"
         self.active_action = None
+        self._set_nav_active("home")
         self.overlay_frame.pack_forget()
         if self.admin_frame is not None:
             self.admin_frame.destroy()
@@ -1216,7 +1327,6 @@ class KioskApp(tk.Tk):
         if self.user_panel_frame is not None:
             self.user_panel_frame.destroy()
             self.user_panel_frame = None
-        self.footer.pack(side="bottom", fill="x", padx=FOOTER_PAYOUTSIDE, pady=(1, FOOTER_PADBOTTOM))
         self.rest_frame.pack(expand=True, fill="both")
         if self.timeout_timer:
             self.after_cancel(self.timeout_timer)
@@ -1226,7 +1336,7 @@ class KioskApp(tk.Tk):
         """Refresh date/time labels once per second while ``clock_active`` is true."""
         now = datetime.datetime.now()
         self.lbl_time.config(text=now.strftime("%H:%M:%S"))
-        self.lbl_date.config(text=now.strftime("%A, %d. %B %Y"))
+        self.lbl_date.config(text=now.strftime("%A, %d. %B %Y").upper())
         if self.clock_active:
             self.after(1000, self.update_clock)
 

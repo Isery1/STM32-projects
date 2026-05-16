@@ -1,0 +1,116 @@
+import tkinter as tk
+from tkinter import font as tkfont
+from datetime import datetime
+
+class ManageIOApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("manageIO RPi")
+        self.root.geometry("800x480")
+        self.root.configure(bg="#0b1326")  # Surface color from Design System
+
+        # Colors from Design System
+        self.colors = {
+            "bg": "#0b1326",
+            "surface_dim": "#0b1326",
+            "surface_bright": "#31394d",
+            "primary": "#7c3aed",
+            "on_primary": "#ffffff",
+            "text": "#ffffff",
+            "text_dim": "#94a3b8",
+            "success": "#10b981"
+        }
+
+        # Custom Fonts (Adjust size for 800x480)
+        self.font_time = tkfont.Font(family="Geist", size=64, weight="bold")
+        self.font_date = tkfont.Font(family="Geist", size=16)
+        self.font_nav = tkfont.Font(family="Geist", size=12)
+        self.font_button = tkfont.Font(family="Geist", size=14, weight="bold")
+
+        self.setup_ui()
+        self.update_clock()
+
+    def setup_ui(self):
+        # Left Navigation Sidebar (80px width)
+        self.sidebar = tk.Frame(self.root, bg="#060e20", width=80)
+        self.sidebar.pack(side="left", fill="y")
+        self.sidebar.pack_propagate(False)
+        
+        # Navigation Items
+        nav_items = [
+            ("Home", "home"),
+            ("User", "person"),
+            ("Admin", "admin_panel_settings"),
+            ("Settings", "settings")
+        ]
+        
+        for text, icon in nav_items:
+            # Container for nav item
+            item_frame = tk.Frame(self.sidebar, bg="#060e20", pady=15)
+            item_frame.pack(fill="x")
+            
+            # Label for text (Simulating icon + text)
+            btn = tk.Label(item_frame, text=text, fg=self.colors["text_dim"], 
+                          bg="#060e20", font=self.font_nav)
+            btn.pack()
+
+        # Main Content Area
+        self.main_content = tk.Frame(self.root, bg=self.colors["bg"])
+        self.main_content.pack(side="right", fill="both", expand=True, padx=40, pady=20)
+
+        # Header with Online Status
+        header = tk.Frame(self.main_content, bg=self.colors["bg"])
+        header.pack(fill="x")
+        
+        tk.Label(header, text="manageIO", fg=self.colors["primary"], bg=self.colors["bg"], 
+                 font=self.font_button).pack(side="left")
+        
+        status_frame = tk.Frame(header, bg="#131b2e", padx=10, pady=2)
+        status_frame.pack(side="right")
+        tk.Canvas(status_frame, width=8, height=8, bg=self.colors["success"], 
+                  highlightthickness=0).pack(side="left", padx=5)
+        tk.Label(status_frame, text="ONLINE", fg=self.colors["success"], bg="#131b2e", 
+                 font=("Geist", 10, "bold")).pack(side="left")
+
+        # Time and Date (Centered in main content)
+        time_container = tk.Frame(self.main_content, bg=self.colors["bg"])
+        time_container.pack(expand=True)
+
+        self.time_label = tk.Label(time_container, text="17:06:57", fg=self.colors["text"], 
+                                  bg=self.colors["bg"], font=self.font_time)
+        self.time_label.pack()
+        
+        self.date_label = tk.Label(time_container, text="SATURDAY, 16. MAY 2026", 
+                                  fg=self.colors["text_dim"], bg=self.colors["bg"], font=self.font_date)
+        self.date_label.pack()
+
+        # Interaction Area (Bottom)
+        interaction_frame = tk.Frame(self.main_content, bg=self.colors["bg"])
+        interaction_frame.pack(fill="x", pady=20)
+
+        # Left: Badge Reader Placeholder
+        self.badge_card = tk.Frame(interaction_frame, bg="#131b2e", highlightbackground="#31394d", 
+                                  highlightthickness=1, width=320, height=140)
+        self.badge_card.pack_propagate(False)
+        self.badge_card.pack(side="left")
+        
+        tk.Label(self.badge_card, text="Tap badge to clock in/out", fg=self.colors["text"], 
+                 bg="#131b2e", font=self.font_button, wraplength=250).pack(expand=True)
+
+        # Right: Primary Action Button
+        status_btn = tk.Button(interaction_frame, text="Check my current status", bg=self.colors["primary"], 
+                               fg=self.colors["on_primary"], font=self.font_button, 
+                               relief="flat", pady=15, padx=30)
+        status_btn.pack(side="right")
+
+    def update_clock(self):
+        now = datetime.now()
+        self.time_label.config(text=now.strftime("%H:%M:%S"))
+        self.date_label.config(text=now.strftime("%A, %d. %B %Y").upper())
+        self.root.after(1000, self.update_clock)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    # root.attributes('-fullscreen', True) # Uncomment for RPi kiosk mode
+    app = ManageIOApp(root)
+    root.mainloop()

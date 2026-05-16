@@ -1,5 +1,7 @@
 # Runtime dependencies for the Raspberry Pi RFID terminal (production / Pi image).
 # Install with: pip install -r requirements.txt   (preferably inside a venv)
+# UI font: install the Geist font on the Pi OS image (system font, not a pip package),
+# then run `fc-cache -f -v`. Fallback can be set with KIOSK_FONT_FAMILY.
 spidev==3.6
 mfrc522==0.0.7
 requests>=2.31.0
