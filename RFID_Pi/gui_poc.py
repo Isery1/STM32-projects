@@ -10,6 +10,7 @@ import sys
 import os
 import time
 import datetime
+import json
 import logging
 import threading
 import tkinter as tk
@@ -17,6 +18,7 @@ from tkinter import ttk
 
 import config
 from auth import AuthenticatedSession
+from offline_queue import OfflineScanQueue, local_now_iso
 
 FONT_FAMILY = "Helvetica"
 
@@ -148,6 +150,7 @@ class KioskApp(tk.Tk):
         rows = [
             ("hardware", "RFID reader"),
             ("network", "Network"),
+            ("time", "Clock time"),
             ("server", "Time server"),
         ]
         for key, title in rows:
@@ -215,6 +218,7 @@ class KioskApp(tk.Tk):
             subtitle = {
                 "hardware": "Reader and wiring",
                 "network": "This device online",
+                "time": "Checking clock time",
                 "server": "Reaching the time server",
             }.get(phase, "One moment…")
             self._boot_subtitle.config(text=subtitle, fg=self.COLORS["subtext"])
@@ -274,13 +278,17 @@ class KioskApp(tk.Tk):
     def _complete_initialization_after_boot(self):
         """Wire session + reader, build widgets, and spawn the RFID polling thread."""
         self.api_session = AuthenticatedSession()
+        self.scan_queue = OfflineScanQueue()
         self.reader, self._is_mock_hw, self._gpio = _create_reader()
 
         self.current_state = "REST"
         self.active_action = None
         self.timeout_timer = None
+        self.admin_frame = None
+        self.admin_summary_label = None
         self.rfid_listener_active = True
         self._scan_ui_lock = threading.Lock()
+        self._sync_lock = threading.Lock()
 
         self.build_ui_frames()
 
@@ -292,19 +300,47 @@ class KioskApp(tk.Tk):
         self.after(2000, self._poll_auth_beacon)
 
         hb_ms = max(5000, int(config.HEARTBEAT_INTERVAL_SECONDS * 1000))
+        self.after(1000, self._sync_pending_async)
         self.after(hb_ms, self._schedule_heartbeat)
 
         self._rfid_thread = threading.Thread(target=self._rfid_listen_loop, daemon=True)
         self._rfid_thread.start()
 
     def _schedule_heartbeat(self):
-        """Recurring timer: send heartbeat while authenticated; reschedules itself."""
+        """Recurring timer: send heartbeat and retry queued scans; reschedules itself."""
         if not self.winfo_exists():
             return
-        if self.api_session.is_approved:
-            self.api_session.send_heartbeat()
+        self._sync_pending_async(send_heartbeat=True)
         hb_ms = max(5000, int(config.HEARTBEAT_INTERVAL_SECONDS * 1000))
         self.after(hb_ms, self._schedule_heartbeat)
+
+    def _sync_pending_async(self, send_heartbeat: bool = False):
+        """Run heartbeat/queue sync on a worker so the Tk thread stays responsive."""
+        if self._closing or not self.winfo_exists():
+            return
+        if not self._sync_lock.acquire(blocking=False):
+            return
+
+        def worker():
+            summary = {"uploaded": 0, "failed": 0, "pending": self.scan_queue.pending_count(), "last_error": ""}
+            try:
+                if send_heartbeat:
+                    self.api_session.send_heartbeat()
+                summary = self.scan_queue.sync_pending(self.api_session)
+            finally:
+                try:
+                    self._sync_lock.release()
+                except RuntimeError:
+                    pass
+            self.after(0, lambda s=summary: self._apply_sync_summary(s))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _apply_sync_summary(self, summary):
+        """Refresh small status copy after a background sync attempt."""
+        if self._closing or not self.winfo_exists():
+            return
+        self._update_connection_copy(summary.get("pending", self.scan_queue.pending_count()))
 
     def create_styles(self):
         """Configure ttk styles for large-footprint kiosk buttons."""
@@ -386,6 +422,17 @@ class KioskApp(tk.Tk):
         )
         self.lbl_instruction.pack(pady=(4, 8))
 
+        self.lbl_queue_status = tk.Label(
+            self.rest_frame,
+            text="Ready to record your time.",
+            font=(FONT_FAMILY, FONT_OVERLAY_BODY),
+            wraplength=OVERLAY_WRAP,
+            justify="center",
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["subtext"],
+        )
+        self.lbl_queue_status.pack(pady=(0, 8))
+
         self.overlay_frame = tk.Frame(self, bg=self.COLORS["bg"])
         self.overlay_inner = tk.Frame(self.overlay_frame, bg=self.COLORS["bg"])
         self.overlay_inner.pack(expand=True, fill="both", padx=PAD_X, pady=PAD_Y)
@@ -435,6 +482,13 @@ class KioskApp(tk.Tk):
             text="Holidays",
             style="Kiosk.TButton",
             command=lambda: self.action_button_clicked("HOLIDAY"),
+        ).pack(side="left", expand=True, padx=(0, btn_pad), fill="x")
+
+        ttk.Button(
+            self.footer,
+            text="Admin",
+            style="Kiosk.TButton",
+            command=lambda: self.action_button_clicked("ADMIN"),
         ).pack(side="left", expand=True, padx=(0, 0), fill="x")
 
         # Dev-only: click instruction to simulate a tap (still uploads to server)
@@ -444,30 +498,39 @@ class KioskApp(tk.Tk):
         """Toggle the small header LED text between online (green) and retrying (amber)."""
         if not self.winfo_exists():
             return
-        if self.api_session.is_approved:
-            self.status_beacon.config(
-                text="● Online",
-                fg=self.COLORS["success"],
-            )
-        else:
-            self.status_beacon.config(
-                text="● Connecting…",
-                fg=self.COLORS["warning"],
-            )
+        self._update_connection_copy(self.scan_queue.pending_count())
         self.after(2000, self._poll_auth_beacon)
+
+    def _update_connection_copy(self, pending_count: int):
+        """Show online/offline and queue state in worker-friendly language."""
+        if self.api_session.is_approved:
+            if pending_count:
+                self.status_beacon.config(text=f"● Online - syncing {pending_count}", fg=self.COLORS["warning"])
+                self.lbl_queue_status.config(
+                    text=f"{pending_count} saved stamp(s) waiting to sync.",
+                    fg=self.COLORS["warning"],
+                )
+            else:
+                self.status_beacon.config(text="● Online", fg=self.COLORS["success"])
+                self.lbl_queue_status.config(text="Ready to record your time.", fg=self.COLORS["subtext"])
+        else:
+            if pending_count:
+                self.status_beacon.config(text=f"● Offline - {pending_count} saved", fg=self.COLORS["warning"])
+                self.lbl_queue_status.config(
+                    text=f"No internet right now. {pending_count} stamp(s) are saved on this terminal.",
+                    fg=self.COLORS["warning"],
+                )
+            else:
+                self.status_beacon.config(text="● Offline-ready", fg=self.COLORS["warning"])
+                self.lbl_queue_status.config(
+                    text="No internet right now. You can still scan your badge.",
+                    fg=self.COLORS["subtext"],
+                )
 
     def _rfid_listen_loop(self):
         """Background loop: wait for tags, push UIDs to :meth:`_on_card_uid` on the UI thread."""
         logger.info("RFID listener thread started.")
         while self.rfid_listener_active:
-            while self.rfid_listener_active and not self.api_session.is_approved:
-                self.api_session.authenticate()
-                if not self.rfid_listener_active:
-                    break
-                if not self.api_session.is_approved:
-                    logger.warning("Not authenticated; retry in 5s…")
-                    time.sleep(5)
-
             if not self.rfid_listener_active:
                 break
 
@@ -494,6 +557,8 @@ class KioskApp(tk.Tk):
         """
         if not self.winfo_exists():
             return
+        if self.current_state == "ADMIN":
+            return
         if not self._scan_ui_lock.acquire(blocking=False):
             return
 
@@ -503,9 +568,13 @@ class KioskApp(tk.Tk):
             self.after_cancel(self.timeout_timer)
             self.timeout_timer = None
 
+        if pending_context:
+            detail = f"We’re asking the server.\n\nBadge: {uid}"
+        else:
+            detail = f"Saving this scan on the terminal first.\n\nBadge: {uid}"
         self.lbl_overlay_title.config(text="One moment…", fg=self.COLORS["accent"])
         self.lbl_overlay_details.config(
-            text=f"We’re sending this to the server.\n\nBadge: {uid}",
+            text=detail,
             fg=self.COLORS["subtext"],
             font=(FONT_FAMILY, FONT_OVERLAY_BODY),
         )
@@ -514,15 +583,45 @@ class KioskApp(tk.Tk):
         self.current_state = "UPLOADING"
 
         def worker():
-            if pending_context == "CHECK_STATUS":
+            if pending_context == "ADMIN":
+                if uid in config.ADMIN_BADGE_UIDS:
+                    result = {"success": True, "admin_access": True}
+                else:
+                    result = {"success": False, "admin_denied": True}
+            elif pending_context == "CHECK_STATUS":
                 result = self.api_session.send_status_query(uid, "status")
             elif pending_context == "FLEXTIME":
                 result = self.api_session.send_status_query(uid, "flextime")
             elif pending_context == "HOLIDAY":
                 result = self.api_session.send_status_query(uid, "holiday")
             else:
-                local_ts = datetime.datetime.now().isoformat(timespec="seconds")
-                result = self.api_session.send_scan(uid, client_local_time_iso=local_ts)
+                queued = self.scan_queue.enqueue_scan(uid, client_local_time=local_now_iso())
+                if self.api_session.is_approved and self._sync_lock.acquire(blocking=False):
+                    try:
+                        summary = self.scan_queue.sync_pending(self.api_session)
+                    finally:
+                        try:
+                            self._sync_lock.release()
+                        except RuntimeError:
+                            pass
+                else:
+                    summary = {"pending": self.scan_queue.pending_count()}
+                queued_after_sync = self.scan_queue.get_by_request_id(queued["request_id"])
+                response_text = queued_after_sync.get("server_response") or ""
+                if queued_after_sync.get("status") == "synced" and response_text:
+                    try:
+                        result = json.loads(response_text)
+                    except ValueError:
+                        result = {"success": True}
+                    result["queue_pending"] = summary.get("pending", self.scan_queue.pending_count())
+                else:
+                    result = {
+                        "success": True,
+                        "offline_saved": True,
+                        "request_id": queued["request_id"],
+                        "client_local_time": queued["client_local_time"],
+                        "queue_pending": summary.get("pending", self.scan_queue.pending_count()),
+                    }
             self.after(0, lambda: self._after_scan_upload(uid, result, pending_context))
 
         threading.Thread(target=worker, daemon=True).start()
@@ -544,7 +643,25 @@ class KioskApp(tk.Tk):
         ev = (result or {}).get("event", "") if ok else ""
         terminal_msg = (result or {}).get("terminal_message", "") if ok else ""
 
-        if ok and pending_context:
+        if ok and (result or {}).get("admin_access"):
+            self._open_admin_page(uid)
+            return
+        if (result or {}).get("admin_denied"):
+            title = "Admin access denied"
+            color = self.COLORS["error"]
+            details = "This badge is not registered as an admin badge."
+        elif ok and (result or {}).get("offline_saved"):
+            pending = int((result or {}).get("queue_pending", self.scan_queue.pending_count()))
+            title = "Saved offline"
+            color = self.COLORS["warning"]
+            details = (
+                "Your badge scan was saved on this terminal.\n\n"
+                "It will sync automatically when the connection returns."
+            )
+            if pending:
+                details = f"{details}\n\n{pending} saved stamp(s) waiting to sync."
+            details = f"{details}\nBadge: {uid}\nClock on device: {(result or {}).get('client_local_time', '')}"
+        elif ok and pending_context:
             title = {
                 "CHECK_STATUS": "Your status",
                 "FLEXTIME": "Flextime",
@@ -594,7 +711,148 @@ class KioskApp(tk.Tk):
             fg="#ffffff",
             font=(FONT_FAMILY, FONT_OVERLAY_BODY),
         )
+        self._update_connection_copy(self.scan_queue.pending_count())
         self.timeout_timer = self.after(4000, self.revert_to_rest)
+
+    def _open_admin_page(self, admin_uid: str):
+        """Show local queue/database status after an admin badge unlocks it."""
+        if self.timeout_timer:
+            self.after_cancel(self.timeout_timer)
+            self.timeout_timer = None
+        self.current_state = "ADMIN"
+        self.active_action = None
+        self.overlay_frame.pack_forget()
+        self.rest_frame.pack_forget()
+        self.footer.pack_forget()
+        if self.admin_frame is not None:
+            self.admin_frame.destroy()
+
+        self.admin_frame = tk.Frame(self, bg=self.COLORS["bg"])
+        self.admin_frame.pack(expand=True, fill="both", padx=PAD_X, pady=(PAD_Y, FOOTER_PADBOTTOM))
+
+        header = tk.Frame(self.admin_frame, bg=self.COLORS["bg"])
+        header.pack(fill="x", pady=(0, 8))
+        tk.Label(
+            header,
+            text="Admin: local database",
+            font=(FONT_FAMILY, FONT_HEADER_TITLE + 2, "bold"),
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["text"],
+        ).pack(side="left")
+        tk.Label(
+            header,
+            text=f"Badge {admin_uid}",
+            font=(FONT_FAMILY, FONT_HEADER_STATUS),
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["subtext"],
+        ).pack(side="right")
+
+        self.admin_summary_label = tk.Label(
+            self.admin_frame,
+            text="",
+            font=(FONT_FAMILY, FONT_OVERLAY_BODY),
+            wraplength=OVERLAY_WRAP,
+            justify="left",
+            anchor="w",
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["subtext"],
+        )
+        self.admin_summary_label.pack(fill="x", pady=(0, 8))
+
+        tk.Label(
+            self.admin_frame,
+            text="Faulty / waiting stamps",
+            font=(FONT_FAMILY, FONT_OVERLAY_BODY, "bold"),
+            anchor="w",
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["text"],
+        ).pack(fill="x")
+
+        self.admin_rows_frame = tk.Frame(self.admin_frame, bg=self.COLORS["card"])
+        self.admin_rows_frame.pack(fill="both", expand=True, pady=(4, 8))
+
+        controls = tk.Frame(self.admin_frame, bg=self.COLORS["bg"])
+        controls.pack(fill="x")
+        ttk.Button(controls, text="Retry sync", style="Kiosk.TButton", command=self._admin_retry_sync).pack(
+            side="left", expand=True, fill="x", padx=(0, 6)
+        )
+        ttk.Button(controls, text="Refresh", style="Kiosk.TButton", command=self._refresh_admin_page).pack(
+            side="left", expand=True, fill="x", padx=(0, 6)
+        )
+        ttk.Button(controls, text="Back", style="Kiosk.TButton", command=self._close_admin_page).pack(
+            side="left", expand=True, fill="x"
+        )
+
+        self._refresh_admin_page()
+
+    def _refresh_admin_page(self):
+        """Reload local SQLite queue rows into the admin page."""
+        if self.admin_frame is None or not self.admin_frame.winfo_exists():
+            return
+        counts = self.scan_queue.status_counts()
+        pending = counts.get("pending", 0)
+        failed = counts.get("failed", 0)
+        synced = counts.get("synced", 0)
+        self.admin_summary_label.config(
+            text=(
+                f"Database: {self.scan_queue.db_path}\n"
+                f"Waiting: {pending}    Failed: {failed}    Synced: {synced}\n"
+                "Failed/waiting rows are kept locally until the server accepts them."
+            )
+        )
+
+        for child in self.admin_rows_frame.winfo_children():
+            child.destroy()
+
+        rows = self.scan_queue.issue_scans(limit=6)
+        if not rows:
+            tk.Label(
+                self.admin_rows_frame,
+                text="No faulty or waiting stamps.",
+                font=(FONT_FAMILY, FONT_OVERLAY_BODY),
+                bg=self.COLORS["card"],
+                fg=self.COLORS["success"],
+            ).pack(expand=True)
+            return
+
+        for row in rows:
+            status_color = self.COLORS["error"] if row["status"] == "failed" else self.COLORS["warning"]
+            line = (
+                f"{row['status'].upper()}  UID {row['uid']}  {row['client_local_time']}\n"
+                f"Retries: {row['retry_count']}  {row['last_sync_error'] or ''}"
+            )
+            tk.Label(
+                self.admin_rows_frame,
+                text=line,
+                font=(FONT_FAMILY, FONT_OVERLAY_BODY - 1),
+                wraplength=OVERLAY_WRAP,
+                justify="left",
+                anchor="w",
+                bg=self.COLORS["card"],
+                fg=status_color,
+            ).pack(fill="x", padx=8, pady=4)
+
+    def _admin_retry_sync(self):
+        """Admin button: trigger a sync attempt and refresh rows afterwards."""
+        if self.admin_summary_label:
+            self.admin_summary_label.config(text="Trying to sync saved stamps…")
+
+        def worker():
+            if self.api_session.is_approved or self.api_session.authenticate(silent=True):
+                self.scan_queue.sync_pending(self.api_session)
+            self.after(0, self._refresh_admin_page)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _close_admin_page(self):
+        """Return from admin page to the normal clock screen."""
+        if self.admin_frame is not None:
+            self.admin_frame.destroy()
+            self.admin_frame = None
+        self.footer.pack(side="bottom", fill="x", padx=FOOTER_PAYOUTSIDE, pady=(4, FOOTER_PADBOTTOM))
+        self.rest_frame.pack(expand=True, fill="both")
+        self.current_state = "REST"
+        self._update_connection_copy(self.scan_queue.pending_count())
 
     def action_button_clicked(self, action_type):
         """
@@ -610,16 +868,20 @@ class KioskApp(tk.Tk):
             "CHECK_STATUS": "My status",
             "FLEXTIME": "Flextime",
             "HOLIDAY": "Holidays",
+            "ADMIN": "Admin check",
         }
         self.lbl_overlay_title.config(
             text=titles.get(action_type, "Next step"),
             fg=self.COLORS["accent"],
         )
+        prompt = (
+            "Scan an admin badge to open the local database page.\n\n"
+            "This screen closes in about 10 seconds."
+            if action_type == "ADMIN"
+            else "Hold your badge on the reader.\n\nThis screen closes in about 10 seconds if no badge is read."
+        )
         self.lbl_overlay_details.config(
-            text=(
-                "Hold your badge on the reader.\n\n"
-                "This screen closes in about 10 seconds if no badge is read."
-            ),
+            text=prompt,
             fg=self.COLORS["subtext"],
             font=(FONT_FAMILY, FONT_OVERLAY_BODY),
         )

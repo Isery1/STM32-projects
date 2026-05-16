@@ -10,9 +10,10 @@ import sys
 import os
 import time
 import logging
-import datetime
+import json
 import config
 from auth import AuthenticatedSession
+from offline_queue import OfflineScanQueue, local_now_iso
 
 # Setup Logging (Outputs to both Console and a local log file for remote debugging)
 logging.basicConfig(
@@ -66,34 +67,29 @@ def main(skip_boot_checks: bool = False) -> None:
     # 2. Instancing drivers and web session
     reader = SimpleMFRC522()
     api_session = AuthenticatedSession()
+    scan_queue = OfflineScanQueue()
 
     # 3. Self-Healing Operational Loop
     last_hb = 0.0
     try:
         active_status_logged = False
         while True:
-            if not api_session.is_approved:
-                active_status_logged = False
-                api_session.authenticate()
-                if not api_session.is_approved:
-                    logger.warning(
-                        "Not authenticated (wrong secret, or server unreachable). Retrying in 5 seconds (Ctrl+C to abort)..."
-                    )
-                    try:
-                        time.sleep(5)
-                    except KeyboardInterrupt:
-                        logger.info("\n[SHUTDOWN] Aborted by user.")
-                        sys.exit(0)
-                    continue
-
             if not active_status_logged:
-                logger.info("🟢 RFID LINK ESTABLISHED: Awaiting hardware scans...")
+                logger.info("RFID reader active: scans are saved locally first, then synced when online.")
                 active_status_logged = True
 
             now_m = time.monotonic()
             if now_m - last_hb >= config.HEARTBEAT_INTERVAL_SECONDS:
                 if api_session.send_heartbeat():
-                    last_hb = now_m
+                    logger.debug("Heartbeat OK.")
+                last_hb = now_m
+                sync_summary = scan_queue.sync_pending(api_session)
+                if sync_summary["uploaded"]:
+                    logger.info(
+                        "Synced %s queued scan(s); %s still pending.",
+                        sync_summary["uploaded"],
+                        sync_summary["pending"],
+                    )
 
             try:
                 card_id = reader.read_id()
@@ -101,17 +97,47 @@ def main(skip_boot_checks: bool = False) -> None:
                 if card_id:
                     card_uid_str = str(card_id).strip()
                     logger.info("*** RFID TAG SCANNED -> ID: %s ***", card_uid_str)
-                    local_ts = datetime.datetime.now().isoformat(timespec="seconds")
-                    result = api_session.send_scan(card_uid_str, client_local_time_iso=local_ts)
-                    if result and result.get("success"):
-                        tm = result.get("terminal_message")
+                    local_ts = local_now_iso()
+                    queued = scan_queue.enqueue_scan(card_uid_str, client_local_time=local_ts)
+                    logger.info(
+                        "Scan saved locally: request_id=%s pending=%s",
+                        queued["request_id"],
+                        scan_queue.pending_count(),
+                    )
+
+                    if api_session.is_approved:
+                        sync_summary = scan_queue.sync_pending(api_session, limit=config.OFFLINE_SYNC_BATCH_SIZE)
+                    else:
+                        sync_summary = {"uploaded": 0, "failed": 0, "pending": scan_queue.pending_count()}
+                    result = scan_queue.get_by_request_id(queued["request_id"])
+                    if result.get("status") == "synced":
+                        logger.info(
+                            "Scan synced: request_id=%s pending=%s",
+                            queued["request_id"],
+                            sync_summary["pending"],
+                        )
+                    else:
+                        logger.warning(
+                            "Scan kept offline; %s scan(s) waiting to sync.",
+                            sync_summary["pending"],
+                        )
+
+                    response_text = (result or {}).get("server_response") or ""
+                    response = {}
+                    if response_text:
+                        try:
+                            response = json.loads(response_text)
+                        except ValueError:
+                            response = {}
+                    if response.get("success"):
+                        tm = response.get("terminal_message")
                         if tm:
                             logger.info("Terminal message: %s", tm)
                         logger.info(
                             "Punch recorded: %s | UID %s | server_time=%s | client_time=%s",
-                            result.get("event"),
+                            response.get("event"),
                             card_uid_str,
-                            result.get("server_time"),
+                            response.get("server_time"),
                             local_ts,
                         )
                     time.sleep(config.SCAN_COOLDOWN_SECONDS)

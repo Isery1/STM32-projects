@@ -6,6 +6,7 @@ Pi needs: punches, read-only status queries, and lightweight heartbeats so the d
 """
 
 import logging
+import datetime
 from typing import Any, Dict, Optional
 
 import requests
@@ -48,7 +49,7 @@ class AuthenticatedSession:
                 config.AUTH_URL,
             )
 
-        payload = {"device_id": config.DEVICE_ID, "secret": config.DEVICE_SECRET}
+        payload = {"device_id": config.DEVICE_ID, "secret": config.DEVICE_SECRET, "app_version": config.APP_VERSION}
 
         try:
             response = self.session.post(config.AUTH_URL, json=payload, timeout=10.0)
@@ -124,7 +125,14 @@ class AuthenticatedSession:
         payload: Dict[str, Any] = {"device_id": config.DEVICE_ID, "uid": uid}
         if client_local_time_iso:
             payload["client_local_time"] = client_local_time_iso
+        return self.send_scan_payload(payload)
 
+    def send_scan_payload(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Send a prepared scan payload to the server.
+
+        Used by the offline queue so retried scans keep the original ``request_id`` and terminal time.
+        """
         if not self.jwt_token:
             if not self.authenticate():
                 logger.error("Cannot send scan: Authentication failed.")
@@ -138,7 +146,7 @@ class AuthenticatedSession:
                     return response.json()
                 except ValueError:
                     logger.info("Scan accepted but response was not JSON.")
-                    return {"success": True, "uid": uid}
+                    return {"success": True, "uid": payload.get("uid"), "request_id": payload.get("request_id")}
 
             logger.error("Server rejected scan. Status: %s. Body: %s", response.status_code, response.text)
             return None
@@ -192,9 +200,14 @@ class AuthenticatedSession:
             if not self.authenticate():
                 return False
         try:
-            response = self.session.post(config.HEARTBEAT_URL, json={}, timeout=10.0)
+            payload = {
+                "device_id": config.DEVICE_ID,
+                "app_version": config.APP_VERSION,
+                "terminal_time": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+            }
+            response = self.session.post(config.HEARTBEAT_URL, json=payload, timeout=10.0)
             if response.status_code == 401 and self.authenticate():
-                response = self.session.post(config.HEARTBEAT_URL, json={}, timeout=10.0)
+                response = self.session.post(config.HEARTBEAT_URL, json=payload, timeout=10.0)
             if response.status_code in (200, 201, 202):
                 return True
             logger.warning("Heartbeat failed: HTTP %s %s", response.status_code, response.text)

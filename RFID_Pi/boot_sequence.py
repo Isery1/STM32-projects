@@ -17,9 +17,12 @@ Environment:
 from __future__ import annotations
 
 import argparse
+import datetime
+import email.utils
 import logging
 import os
 import socket
+import subprocess
 import sys
 import time
 from typing import Callable, Dict, List, Optional, Tuple
@@ -292,6 +295,88 @@ def check_network(emit: OnStep = None) -> None:
         emit("network", "ok", f"{detail} — internet OK")
 
 
+def _parse_http_date(value: str) -> Optional[datetime.datetime]:
+    """Parse an HTTP Date header as timezone-aware UTC."""
+    try:
+        dt = email.utils.parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.astimezone(datetime.timezone.utc)
+
+
+def _set_system_time_utc(server_dt: datetime.datetime) -> Tuple[bool, str]:
+    """
+    Best-effort system clock update.
+
+    The desktop autostart user normally cannot change system time; non-root runs try passwordless
+    ``sudo -n`` and otherwise keep the Pi clock.
+    """
+    if os.name != "posix":
+        return False, "time set skipped (not a Linux/Pi host)"
+    timestamp = server_dt.strftime("%Y-%m-%d %H:%M:%S")
+    cmd = ["date", "-u", "-s", timestamp]
+    geteuid = getattr(os, "geteuid", None)
+    if geteuid is not None and geteuid() != 0:
+        cmd = ["sudo", "-n", *cmd]
+    try:
+        subprocess.run(
+            cmd,
+            check=True,
+            timeout=8.0,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, f"time set failed (needs root or passwordless sudo): {exc}"
+    return True, "Pi clock updated from server"
+
+
+def check_server_time(emit: OnStep = None) -> Optional[datetime.datetime]:
+    """
+    Read the server's HTTP Date header and align the Pi clock when drift is large.
+
+    Returns:
+        Parsed server time when available, otherwise ``None`` so callers can continue offline.
+    """
+    if emit:
+        emit("time", "running", "")
+    try:
+        response = requests.get(config.SERVER_URL, timeout=8.0)
+    except requests.exceptions.RequestException as exc:
+        if emit:
+            emit("time", "skip", "Offline — using this terminal's clock")
+        logger.warning("Server time check skipped: %s", exc)
+        return None
+
+    server_dt = _parse_http_date(response.headers.get("Date", ""))
+    if server_dt is None:
+        if emit:
+            emit("time", "skip", "Server did not provide a clock header")
+        logger.warning("Server time check: no parseable Date header.")
+        return None
+
+    local_dt = datetime.datetime.now(datetime.timezone.utc)
+    drift = abs((server_dt - local_dt).total_seconds())
+    if drift <= config.BOOT_TIME_SYNC_MAX_DRIFT_SECONDS:
+        if emit:
+            emit("time", "ok", f"Clock OK (drift {int(drift)}s)")
+        logger.info("Server time check: OK (drift %.1fs).", drift)
+        return server_dt
+
+    ok, detail = _set_system_time_utc(server_dt)
+    if emit:
+        state = "ok" if ok else "skip"
+        emit("time", state, f"{detail} (drift {int(drift)}s)")
+    if ok:
+        logger.info("Server time check: %s (drift %.1fs).", detail, drift)
+    else:
+        logger.warning("Server time check: %s (drift %.1fs).", detail, drift)
+    return server_dt
+
+
 def check_auth_endpoint_expect_401(emit: OnStep = None) -> None:
     """
     POST invalid credentials to the login URL — success means we got a live app that rejects bad secrets.
@@ -337,13 +422,13 @@ def run_boot_checks(on_step: OnStep = None, *, cli_exit: bool = True) -> None:
             raise :class:`BootCheckFailed` so the GUI can show the message.
 
     Phases for ``on_step``:
-        ``hardware``, ``network``, ``server`` — states ``running``, ``skip``, ``ok``, ``error``.
+        ``hardware``, ``network``, ``time``, ``server`` — states ``running``, ``skip``, ``ok``, ``error``.
     """
     if skip_boot_checks_requested():
         logger.info("SKIP_BOOT_CHECKS set — skipping startup checks.")
         return
 
-    logger.info("Boot sequence: hardware (RFID) → network → server…")
+    logger.info("Boot sequence: hardware (RFID) → network/time/server (offline allowed)…")
 
     if _env_truthy(MOCK_ENV):
         logger.info("USE_MOCK_RFID — skipping RC522 hardware probe.")
@@ -364,17 +449,17 @@ def run_boot_checks(on_step: OnStep = None, *, cli_exit: bool = True) -> None:
     except Exception as e:
         if on_step:
             parts = str(e).split(". ", 1)
-            on_step("network", "error", parts[0] if parts else str(e))
-        logger.error("Network check failed: %s", e)
-        _abort(3, str(e), cli_exit=cli_exit)
+            on_step("network", "skip", parts[0] if parts else str(e))
+        logger.warning("Network check failed; continuing offline: %s", e)
+
+    check_server_time(on_step)
 
     try:
         check_auth_endpoint_expect_401(on_step)
     except Exception as e:
         if on_step:
-            on_step("server", "error", str(e))
-        logger.error("Server check failed: %s", e)
-        _abort(4, str(e), cli_exit=cli_exit)
+            on_step("server", "skip", "Offline — scans will be saved locally")
+        logger.warning("Server check failed; continuing offline: %s", e)
 
     logger.info("Boot sequence completed successfully.")
 

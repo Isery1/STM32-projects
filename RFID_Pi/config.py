@@ -17,6 +17,7 @@ AUTH_ENDPOINT = os.getenv("AUTH_ENDPOINT", "/api/auth/login").lstrip('/')
 SCAN_ENDPOINT = os.getenv("SCAN_ENDPOINT", "/api/scans").lstrip('/')
 HEARTBEAT_ENDPOINT = os.getenv("HEARTBEAT_ENDPOINT", "heartbeat").lstrip('/')
 QUERY_ENDPOINT = os.getenv("QUERY_ENDPOINT", "query_punch_status").lstrip('/')
+APP_VERSION = os.getenv("APP_VERSION", "0.1.0")
 
 # Derived absolute URLs
 # Handle query parameter base URLs (e.g., URL ends with '=' or '?') without prepending extraneous slashes
@@ -35,10 +36,18 @@ else:
 # Device Credentials
 DEVICE_ID = os.getenv("DEVICE_ID", "default-pi-device")
 DEVICE_SECRET = os.getenv("DEVICE_SECRET", "dev-secret")
+ADMIN_BADGE_UIDS = {
+    uid.strip()
+    for uid in os.getenv("ADMIN_BADGE_UIDS", "250256679402").split(",")
+    if uid.strip()
+}
 
 # Behavioral Configuration
 SCAN_COOLDOWN_SECONDS = float(os.getenv("SCAN_COOLDOWN_SECONDS", "2.0"))
 HEARTBEAT_INTERVAL_SECONDS = float(os.getenv("HEARTBEAT_INTERVAL_SECONDS", "45.0"))
+OFFLINE_QUEUE_DB = os.getenv("OFFLINE_QUEUE_DB", "offline_queue.sqlite3")
+OFFLINE_SYNC_BATCH_SIZE = int(os.getenv("OFFLINE_SYNC_BATCH_SIZE", "25"))
+BOOT_TIME_SYNC_MAX_DRIFT_SECONDS = int(os.getenv("BOOT_TIME_SYNC_MAX_DRIFT_SECONDS", "60"))
 
 
 def validate_config() -> None:
@@ -69,4 +78,5 @@ def validate_config() -> None:
     print(f"Heartbeat Endpoint: {HEARTBEAT_URL}")
     print(f"Query Endpoint: {QUERY_URL}")
     print(f"Device ID: {DEVICE_ID}")
+    print(f"App Version: {APP_VERSION}")
     print("----------------------------------------")
