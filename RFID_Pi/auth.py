@@ -172,7 +172,7 @@ class AuthenticatedSession:
             "uid": uid,
             "query_kind": query_kind,
         }
-        if not self.jwt_token:
+        if not self.jwt_token or not self.is_approved:
             if not self.authenticate():
                 logger.error("Cannot query: Authentication failed.")
                 return None

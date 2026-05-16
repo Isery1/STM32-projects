@@ -48,6 +48,7 @@ HEARTBEAT_INTERVAL_SECONDS = float(os.getenv("HEARTBEAT_INTERVAL_SECONDS", "45.0
 OFFLINE_QUEUE_DB = os.getenv("OFFLINE_QUEUE_DB", "offline_queue.sqlite3")
 OFFLINE_SYNC_BATCH_SIZE = int(os.getenv("OFFLINE_SYNC_BATCH_SIZE", "25"))
 BOOT_TIME_SYNC_MAX_DRIFT_SECONDS = int(os.getenv("BOOT_TIME_SYNC_MAX_DRIFT_SECONDS", "60"))
+KIOSK_FULLSCREEN = os.getenv("KIOSK_FULLSCREEN", "true").strip().lower() in ("1", "true", "yes", "on")
 
 
 def validate_config() -> None:

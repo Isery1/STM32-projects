@@ -30,6 +30,8 @@ Connect your MFRC522 reader to the Raspberry Pi's 40-pin header using female-to-
 > [!CAUTION]
 > **Do not connect the RC522 reader to 5V.** The module is rated for 3.3V, and using 5V will permanently damage the reader's IC and potentially the Raspberry Pi's GPIO pins.
 
+For installed terminals, do not leave these as loose jumper wires. Use the enclosure model, fixed internal harness, BOM, and field checklist in [`DEPLOYMENT_HARDWARE.md`](DEPLOYMENT_HARDWARE.md). The OpenSCAD source for the printable Raspberry Pi 4 + official 7-inch touchscreen case is [`rfid_terminal_enclosure.scad`](rfid_terminal_enclosure.scad).
+
 ---
 
 ## 🛠️ Raspberry Pi Environment Configuration
