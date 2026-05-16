@@ -14,6 +14,8 @@ import json
 import logging
 import threading
 import math
+import socket
+import subprocess
 import tkinter as tk
 from tkinter import ttk
 
@@ -190,6 +192,26 @@ class RoundedPanel(tk.Canvas):
         self.coords(self.window_id, inset, inset)
         self.itemconfigure(self.window_id, width=max(1, w - (inset * 2)), height=max(1, h - (inset * 2)))
 
+class ScrollableRoundedPanel(RoundedPanel):
+    """A RoundedPanel that supports vertical scrolling for its inner content."""
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.v_scroll = tk.Scrollbar(self, orient="vertical", command=self.yview)
+        self.v_scroll.pack(side="right", fill="y", padx=2)
+        self.configure(yscrollcommand=self.v_scroll.set)
+        self.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.inner.bind("<Configure>", lambda e: self.configure(scrollregion=self.bbox("all")))
+
+    def _on_mousewheel(self, event):
+        if self.winfo_ismapped():
+            self.yview_scroll(int(-1*(event.delta/120)), "units")
+
+    def _redraw(self, _event=None):
+        super()._redraw(_event)
+        inset = max(8, self.radius // 2)
+        # Use a fixed width for the inner window to allow vertical scrolling
+        self.itemconfigure(self.window_id, width=max(1, self.winfo_width() - (inset * 2) - 25))
+
 
 class KioskApp(tk.Tk):
     """Root Tk window: boot splash (optional) + idle clock UI + scan overlay + footer actions."""
@@ -234,6 +256,83 @@ class KioskApp(tk.Tk):
             "error": "#fb7185",
             "button": "#8b5cf6",
             "status_bg": "#132328",
+        }
+
+        # Session-persistent settings (load from file)
+        self.settings_path = os.path.join(os.path.dirname(__file__), "app_settings.json")
+        self.settings = self._load_settings()
+
+        self.current_lang = self.settings.get("lang", "EN")
+        self.current_brightness = self.settings.get("brightness", 80)
+        self.IDLE_TIMEOUT_MS = self.settings.get("timeout_ms", 60000)
+        self.current_timeout_label = {30000: "30 Seconds", 60000: "1 Minute",
+                                       300000: "5 Minutes", 3600000: "Never"}.get(self.IDLE_TIMEOUT_MS, "1 Minute")
+
+        self.TRANSLATIONS = {
+            "EN": {
+                "clock_instr": "●  TAP BADGE TO CLOCK IN/OUT",
+                "clock_instr_syncing": "●  SYNCING {} SAVED STAMPS…",
+                "clock_instr_offline": "●  OFFLINE MODE - BADGE SCAN ACTIVE",
+                "clock_instr_offline_saved": "●  OFFLINE - {} STAMPS SAVED",
+                "btn_status": "Check my current status",
+                "nav_home": "HOME",
+                "nav_user": "USER",
+                "nav_admin": "ADMIN",
+                "nav_settings": "SETTINGS",
+                "settings_title": "TERMINAL SETTINGS",
+                "settings_lang": "System Language",
+                "settings_timeout": "Screen Off Timeout",
+                "settings_brightness": "Display Brightness",
+                "settings_network": "Network Status",
+                "settings_save": "SAVE SETTINGS",
+                "auth_title": "AUTHENTICATE",
+                "auth_admin": "Scan admin badge to view terminal logs.",
+                "auth_settings": "Scan admin badge to unlock settings.",
+                "user_title": "What would you like to check?",
+                "user_subtitle_online": "Choose an option, then scan your badge.",
+                "user_subtitle_offline": "No internet connection right now. Please come back later.",
+                "btn_flextime": "Flextime",
+                "btn_holidays": "Holidays",
+                "admin_title": "Admin overview",
+                "admin_unlocked": "Unlocked",
+                "admin_stamps_title": "Stamps that need attention",
+                "admin_all_good": "Everything looks good. No saved stamps need attention.",
+                "admin_sync_btn": "Sync All",
+                "admin_refresh_btn": "Refresh",
+                "save_success": "Settings saved and applied.",
+            },
+            "DE": {
+                "clock_instr": "●  BADGE TIPPEN ZUM EIN/AUSSTEMPELN",
+                "clock_instr_syncing": "●  {} STEMPEL WERDEN SYNCHRONISIERT…",
+                "clock_instr_offline": "●  OFFLINE-MODUS - BADGE-SCAN AKTIV",
+                "clock_instr_offline_saved": "●  OFFLINE - {} STEMPEL GESPEICHERT",
+                "btn_status": "Status überprüfen",
+                "nav_home": "HOME",
+                "nav_user": "BENUTZER",
+                "nav_admin": "ADMIN",
+                "nav_settings": "EINSTELLUNGEN",
+                "settings_title": "TERMINAL EINSTELLUNGEN",
+                "settings_lang": "Systemsprache",
+                "settings_timeout": "Bildschirm ausschalten nach",
+                "settings_brightness": "Bildschirmhelligkeit",
+                "settings_network": "Netzwerkstatus",
+                "settings_save": "EINSTELLUNGEN SPEICHERN",
+                "auth_title": "AUTHENTIFIZIEREN",
+                "auth_admin": "Admin-Badge scannen für Protokolle.",
+                "auth_settings": "Admin-Badge scannen für Einstellungen.",
+                "user_title": "Was möchten Sie prüfen?",
+                "user_subtitle_online": "Option wählen, dann Badge scannen.",
+                "user_subtitle_offline": "Keine Internetverbindung. Bitte später versuchen.",
+                "btn_flextime": "Gleitzeit",
+                "btn_holidays": "Urlaub",
+                "admin_title": "Admin-Übersicht",
+                "admin_unlocked": "Entsperrt",
+                "admin_stamps_title": "Stempel mit Handlungsbedarf",
+                "admin_all_good": "Alles in Ordnung. Keine ausstehenden Stempel.",
+                "admin_sync_btn": "Alles Synchronisieren",
+                "admin_refresh_btn": "Aktualisieren",
+                "save_success": "Einstellungen gespeichert.",
+            }
         }
 
         self.create_styles()
@@ -412,6 +511,7 @@ class KioskApp(tk.Tk):
         self.admin_frame = None
         self.admin_summary_label = None
         self.user_panel_frame = None
+        self.settings_frame = None
         self.nav_items = {}
         self.rfid_listener_active = True
         self._scan_ui_lock = threading.Lock()
@@ -689,13 +789,8 @@ class KioskApp(tk.Tk):
             canvas.create_polygon(20, 8, 32, 12, 30, 26, 20, 34, 10, 26, 8, 12, fill="", outline=color, width=3)
             canvas.create_oval(18, 16, 22, 20, fill=color, outline=color)
             canvas.create_line(20, 20, 20, 26, fill=color, width=3)
-        elif icon_type == "settings": # Professional Double-End Wrench
-            # Handle
-            canvas.create_line(12, 28, 28, 12, fill=color, width=8)
-            # Head 1
-            canvas.create_arc(18, 4, 36, 22, start=45, extent=270, outline=color, width=5, style="arc")
-            # Head 2
-            canvas.create_arc(4, 18, 22, 36, start=225, extent=270, outline=color, width=5, style="arc")
+        elif icon_type == "settings": # Placeholder for now
+            canvas.create_oval(15, 15, 25, 25, outline=color, width=3)
 
     def _set_nav_active(self, active_key: str):
         """Highlight only the currently selected sidebar item and redraw its icon."""
@@ -726,13 +821,8 @@ class KioskApp(tk.Tk):
         self.action_button_clicked("CHECK_STATUS")
 
     def _open_settings_info(self):
-        """Placeholder settings screen from the sidebar."""
-        self._set_nav_active("settings")
-        self._show_info_screen(
-            "Settings",
-            "Settings will be available here later.",
-            self.COLORS["accent"],
-        )
+        """Require admin badge to open settings."""
+        self.action_button_clicked("SETTINGS")
 
     def _show_info_screen(self, title: str, details: str, color: str):
         """Show a returnable message screen with the same overlay design."""
@@ -745,9 +835,12 @@ class KioskApp(tk.Tk):
         if self.admin_frame is not None:
             self.admin_frame.destroy()
             self.admin_frame = None
+        # Preserve active_action if we are coming from a 'waiting for card' state
+        if self.current_state != "WAITING_CARD":
+            self.active_action = None
+        
         self.rest_frame.pack_forget()
         self.current_state = "INFO"
-        self.active_action = None
         self.lbl_overlay_title.config(text=title, fg=color)
         self.lbl_overlay_details.config(
             text=details,
@@ -766,19 +859,20 @@ class KioskApp(tk.Tk):
 
     def _update_connection_copy(self, pending_count: int):
         """Show online/offline and queue state in worker-friendly language."""
+        t = self.TRANSLATIONS[self.current_lang]
         if self.api_session.is_approved:
             if pending_count:
                 self.status_beacon.config(text=f"● Online - syncing {pending_count}", fg=self.COLORS["warning"])
-                self.lbl_instruction.config(text=f"●  SYNCING {pending_count} SAVED STAMPS…")
+                self.lbl_instruction.config(text=t["clock_instr_syncing"].format(pending_count))
             else:
                 self.status_beacon.config(text="● Online", fg=self.COLORS["success"])
-                self.lbl_instruction.config(text="●  TAP BADGE TO CLOCK IN/OUT")
+                self.lbl_instruction.config(text=t["clock_instr"])
         else:
-            self.status_beacon.config(text=f"● Offline mode", fg=self.COLORS["warning"])
+            self.status_beacon.config(text="● Offline mode", fg=self.COLORS["warning"])
             if pending_count:
-                self.lbl_instruction.config(text=f"●  OFFLINE - {pending_count} STAMPS SAVED")
+                self.lbl_instruction.config(text=t["clock_instr_offline_saved"].format(pending_count))
             else:
-                self.lbl_instruction.config(text="●  OFFLINE MODE - BADGE SCAN ACTIVE")
+                self.lbl_instruction.config(text=t["clock_instr_offline"])
 
     def _rfid_listen_loop(self):
         """Background loop: wait for tags, push UIDs to :meth:`_on_card_uid` on the UI thread."""
@@ -810,7 +904,7 @@ class KioskApp(tk.Tk):
         """
         if not self.winfo_exists():
             return
-        if self.current_state not in ("REST", "WAITING_CARD"):
+        if self.current_state not in ("REST", "WAITING_CARD", "INFO"):
             logger.info("Ignoring badge scan while screen is %s.", self.current_state)
             return
         if not self._scan_ui_lock.acquire(blocking=False):
@@ -837,9 +931,9 @@ class KioskApp(tk.Tk):
         self.current_state = "UPLOADING"
 
         def worker():
-            if pending_context == "ADMIN":
+            if pending_context in ("ADMIN", "SETTINGS"):
                 if uid in config.ADMIN_BADGE_UIDS:
-                    result = {"success": True, "admin_access": True}
+                    result = {"success": True, "admin_access": True, "target": "settings" if pending_context == "SETTINGS" else "admin"}
                 else:
                     result = {"success": False, "admin_denied": True}
             elif pending_context == "CHECK_STATUS":
@@ -905,7 +999,10 @@ class KioskApp(tk.Tk):
         detail_font = (FONT_FAMILY, FONT_OVERLAY_BODY)
 
         if ok and (result or {}).get("admin_access"):
-            self._open_admin_page(uid)
+            if (result or {}).get("target") == "settings":
+                self._open_settings_page()
+            else:
+                self._open_admin_page(uid)
             return
         if (result or {}).get("admin_denied"):
             title = "Admin access denied"
@@ -1093,6 +1190,9 @@ class KioskApp(tk.Tk):
         if self.user_panel_frame is not None:
             self.user_panel_frame.destroy()
             self.user_panel_frame = None
+        if self.settings_frame is not None:
+            self.settings_frame.destroy()
+            self.settings_frame = None
         self.overlay_frame.pack_forget()
         self.rest_frame.pack_forget()
         if self.admin_frame is not None:
@@ -1192,6 +1292,168 @@ class KioskApp(tk.Tk):
         self._refresh_admin_page()
         self._schedule_idle_return()
 
+    def _open_settings_page(self):
+        """Admin-only settings panel UI."""
+        t = self.TRANSLATIONS[self.current_lang]
+        if self.timeout_timer:
+            self.after_cancel(self.timeout_timer)
+        self.current_state = "SETTINGS"
+        self._set_nav_active("settings")
+
+        if self.admin_frame: self.admin_frame.destroy()
+        if self.user_panel_frame: self.user_panel_frame.destroy()
+        self.overlay_frame.pack_forget()
+        self.rest_frame.pack_forget()
+
+        self.settings_frame = tk.Frame(self.body, bg=self.COLORS["bg"])
+        self.settings_frame.pack(expand=True, fill="both", padx=30, pady=20)
+
+        tk.Label(
+            self.settings_frame,
+            text=t["settings_title"],
+            font=(FONT_FAMILY, 18, "bold"),
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["text"]
+        ).pack(anchor="w", pady=(0, 20))
+
+        container = ScrollableRoundedPanel(
+            self.settings_frame,
+            bg="#131b2e",
+            border=self.COLORS["card_border"],
+            radius=16
+        )
+        container.pack(fill="both", expand=True)
+        inner = container.inner
+
+        def add_setting(label_text, widget_class, **kwargs):
+            row = tk.Frame(inner, bg="#131b2e", height=60)
+            row.pack(fill="x", pady=10, padx=20)
+            row.pack_propagate(False)
+            tk.Label(row, text=label_text, font=(FONT_FAMILY, 12, "bold"), bg="#131b2e", fg="#f8fafc").pack(side="left")
+            w = widget_class(row, **kwargs)
+            w.pack(side="right", padx=5)
+            return w
+
+        # 1. Language
+        lang_cb = add_setting(t["settings_lang"], ttk.Combobox,
+                              values=["🇺🇸 English", "🇩🇪 Deutsch"],
+                              state="readonly", width=15)
+        lang_cb.set("🇺🇸 English" if self.current_lang == "EN" else "🇩🇪 Deutsch")
+        lang_cb.bind("<<ComboboxSelected>>", lambda e: self._update_lang(lang_cb.get()))
+
+        # 2. Screen Timeout
+        time_cb = add_setting(t["settings_timeout"], ttk.Combobox,
+                              values=["30 Seconds", "1 Minute", "5 Minutes", "Never"],
+                              state="readonly", width=15)
+        time_cb.set(self.current_timeout_label)
+        time_cb.bind("<<ComboboxSelected>>", lambda e: self._update_timeout(time_cb.get()))
+
+        # 3. Brightness
+        bright_row = tk.Frame(inner, bg="#131b2e", height=60)
+        bright_row.pack(fill="x", pady=10, padx=20)
+        bright_row.pack_propagate(False)
+        tk.Label(bright_row, text=t["settings_brightness"], font=(FONT_FAMILY, 12, "bold"), bg="#131b2e", fg="#f8fafc").pack(side="left")
+        scale = ttk.Scale(bright_row, from_=10, to=100, orient="horizontal", command=lambda v: self._update_brightness(v))
+        scale.set(self.current_brightness)
+        scale.pack(side="right", fill="x", expand=True, padx=(40, 10))
+
+        # 4. Network Info
+        net_row = tk.Frame(inner, bg="#131b2e", height=60)
+        net_row.pack(fill="x", pady=10, padx=20)
+        net_row.pack_propagate(False)
+        tk.Label(net_row, text=t["settings_network"], font=(FONT_FAMILY, 12, "bold"), bg="#131b2e", fg="#f8fafc").pack(side="left")
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            status = f"ONLINE ({ip})"
+            net_color = self.COLORS["success"]
+        except:
+            status = "OFFLINE"
+            net_color = self.COLORS["error"]
+        tk.Label(net_row, text=status, font=(FONT_FAMILY, 11), bg="#131b2e", fg=net_color).pack(side="right")
+
+        # 5. Save Button
+        save_btn_row = tk.Frame(inner, bg="#131b2e", height=80)
+        save_btn_row.pack(fill="x", pady=20, padx=20)
+        RoundedButton(
+            save_btn_row,
+            t["settings_save"],
+            self._save_settings_to_disk,
+            width=280,
+            height=50,
+            bg=self.COLORS["success"],
+            fg="#ffffff",
+            active_bg="#059669",
+            border=self.COLORS["success"],
+            font=(FONT_FAMILY, 10, "bold")
+        ).pack(expand=True)
+
+    def _load_settings(self):
+        try:
+            if os.path.exists(self.settings_path):
+                with open(self.settings_path, "r") as f:
+                    return json.load(f)
+        except: pass
+        return {"lang": "EN", "brightness": 80, "timeout_ms": 60000}
+
+    def _save_settings_to_disk(self):
+        self.settings = {
+            "lang": self.current_lang,
+            "brightness": self.current_brightness,
+            "timeout_ms": self.IDLE_TIMEOUT_MS
+        }
+        try:
+            with open(self.settings_path, "w") as f:
+                json.dump(self.settings, f)
+            t = self.TRANSLATIONS[self.current_lang]
+            self._show_info_screen("\u2713", t["save_success"], self.COLORS["success"])
+        except Exception as e:
+            self._show_info_screen("ERROR", f"Failed to save: {e}", self.COLORS["error"])
+
+    def _update_lang(self, val):
+        self.current_lang = "DE" if "Deutsch" in val else "EN"
+        self._apply_translations()
+
+    def _apply_translations(self):
+        t = self.TRANSLATIONS[self.current_lang]
+        self.lbl_instruction.config(text=t["clock_instr"])
+        # Update sidebar nav labels
+        if hasattr(self, 'nav_items'):
+            for key, widgets in self.nav_items.items():
+                _, _, lbl = widgets
+                val = t.get(f"nav_{key}")
+                if val:
+                    lbl.config(text=val)
+        # Update status button text
+        if hasattr(self, 'btn_status_wrap'):
+            for w in self.btn_status_wrap.winfo_children():
+                if isinstance(w, RoundedButton):
+                    w.text = t["btn_status"]
+                    w._draw(w.normal_bg)
+
+    def _update_timeout(self, val):
+        mapping = {"30 Seconds": 30000, "1 Minute": 60000, "5 Minutes": 300000, "Never": 3600000,
+                   "30 Sekunden": 30000, "1 Minute": 60000, "5 Minuten": 300000, "Nie": 3600000}
+        self.IDLE_TIMEOUT_MS = mapping.get(val, 60000)
+
+    def _update_brightness(self, val):
+        self.current_brightness = int(float(val))
+        try:
+            # Try multiple common Pi backlight paths
+            paths = [
+                "/sys/class/backlight/rpi_backlight/brightness",
+                "/sys/class/backlight/soc:backlight/brightness"
+            ]
+            for p in paths:
+                if os.path.exists(p):
+                    with open(p, "w") as f:
+                        f.write(str(int(self.current_brightness * 2.55)))
+                    break
+        except:
+            pass
+
     def _refresh_admin_page(self):
         """Reload local SQLite queue rows into the admin page."""
         if self.admin_frame is None or not self.admin_frame.winfo_exists():
@@ -1263,6 +1525,9 @@ class KioskApp(tk.Tk):
         if self.user_panel_frame is not None:
             self.user_panel_frame.destroy()
             self.user_panel_frame = None
+        if self.settings_frame is not None:
+            self.settings_frame.destroy()
+            self.settings_frame = None
         self.rest_frame.pack(expand=True, fill="both")
         self.current_state = "REST"
         self._update_connection_copy(self.scan_queue.pending_count())
@@ -1283,40 +1548,28 @@ class KioskApp(tk.Tk):
             return
         self.current_state = "WAITING_CARD"
         self.active_action = action_type
+        self._set_nav_active(action_type.lower() if action_type in ("ADMIN", "SETTINGS") else "home")
+
+        t = self.TRANSLATIONS[self.current_lang]
         if action_type == "ADMIN":
-            self._set_nav_active("admin")
+            self._show_info_screen(t["auth_title"], t["auth_admin"], self.COLORS["accent"])
+        elif action_type == "SETTINGS":
+            self._show_info_screen(t["auth_title"], t["auth_settings"], self.COLORS["accent"])
+        else:
+            self.lbl_overlay_title.config(text={"CHECK_STATUS": "My status", "FLEXTIME": "Flextime", "HOLIDAY": "Holidays"}.get(action_type, "Next step"), fg=self.COLORS["accent"])
+            self.lbl_overlay_details.config(text="Hold your badge on the reader to continue.", fg=self.COLORS["subtext"], font=(FONT_FAMILY, FONT_OVERLAY_BODY))
+            self.rest_frame.pack_forget()
+            self.overlay_frame.pack(expand=True, fill="both")
+
         if self.admin_frame is not None:
             self.admin_frame.destroy()
             self.admin_frame = None
         if self.user_panel_frame is not None:
             self.user_panel_frame.destroy()
             self.user_panel_frame = None
-
-        titles = {
-            "CHECK_STATUS": "My status",
-            "FLEXTIME": "Flextime",
-            "HOLIDAY": "Holidays",
-            "ADMIN": "Admin check",
-        }
-        self.lbl_overlay_title.config(
-            text=titles.get(action_type, "Next step"),
-            fg=self.COLORS["accent"],
-        )
-        prompt = (
-            "Scan an admin badge to open the local database page.\n\n"
-            "This screen returns automatically after one minute."
-            if action_type == "ADMIN"
-            else "Hold your badge on the reader.\n\nThis screen returns automatically after one minute."
-        )
-        self.lbl_overlay_details.config(
-            text=prompt,
-            fg=self.COLORS["subtext"],
-            font=(FONT_FAMILY, FONT_OVERLAY_BODY),
-        )
-        self.rest_frame.pack_forget()
-        if self.user_panel_frame is not None:
-            self.user_panel_frame.pack_forget()
-        self.overlay_frame.pack(expand=True, fill="both")
+        if self.settings_frame is not None:
+            self.settings_frame.destroy()
+            self.settings_frame = None
 
         self._schedule_idle_return()
 
@@ -1332,6 +1585,9 @@ class KioskApp(tk.Tk):
         if self.user_panel_frame is not None:
             self.user_panel_frame.destroy()
             self.user_panel_frame = None
+        if self.settings_frame is not None:
+            self.settings_frame.destroy()
+            self.settings_frame = None
         self.rest_frame.pack(expand=True, fill="both")
         if self.timeout_timer:
             self.after_cancel(self.timeout_timer)
