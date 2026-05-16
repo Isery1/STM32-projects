@@ -263,10 +263,11 @@ class KioskApp(tk.Tk):
         self.settings = self._load_settings()
 
         self.current_lang = self.settings.get("lang", "EN")
-        self.current_brightness = self.settings.get("brightness", 80)
         self.IDLE_TIMEOUT_MS = self.settings.get("timeout_ms", 60000)
-        self.current_timeout_label = {30000: "30 Seconds", 60000: "1 Minute",
-                                       300000: "5 Minutes", 3600000: "Never"}.get(self.IDLE_TIMEOUT_MS, "1 Minute")
+        self.terminal_name = self.settings.get("terminal_name", "")
+        self.scan_cooldown_s = self.settings.get("scan_cooldown", 2.0)
+        self.sound_enabled = self.settings.get("sound", False)
+        self.sync_interval_ms = self.settings.get("sync_interval_ms", 60000)
 
         self.TRANSLATIONS = {
             "EN": {
@@ -281,10 +282,15 @@ class KioskApp(tk.Tk):
                 "nav_settings": "SETTINGS",
                 "settings_title": "TERMINAL SETTINGS",
                 "settings_lang": "System Language",
-                "settings_timeout": "Screen Off Timeout",
-                "settings_brightness": "Display Brightness",
+                "settings_terminal_name": "Terminal Name",
+                "settings_scan_cooldown": "Scan Cooldown",
+                "settings_sound": "Sound on Scan",
+                "settings_sync": "Sync Interval",
                 "settings_network": "Network Status",
+                "settings_info": "Terminal Info",
                 "settings_save": "SAVE SETTINGS",
+                "sound_on": "ON",
+                "sound_off": "OFF",
                 "auth_title": "AUTHENTICATE",
                 "auth_admin": "Scan admin badge to view terminal logs.",
                 "auth_settings": "Scan admin badge to unlock settings.",
@@ -313,10 +319,15 @@ class KioskApp(tk.Tk):
                 "nav_settings": "EINSTELLUNGEN",
                 "settings_title": "TERMINAL EINSTELLUNGEN",
                 "settings_lang": "Systemsprache",
-                "settings_timeout": "Bildschirm ausschalten nach",
-                "settings_brightness": "Bildschirmhelligkeit",
+                "settings_terminal_name": "Terminal-Name",
+                "settings_scan_cooldown": "Scan-Wartezeit",
+                "settings_sound": "Ton beim Scannen",
+                "settings_sync": "Sync-Intervall",
                 "settings_network": "Netzwerkstatus",
+                "settings_info": "Terminal-Info",
                 "settings_save": "EINSTELLUNGEN SPEICHERN",
+                "sound_on": "AN",
+                "sound_off": "AUS",
                 "auth_title": "AUTHENTIFIZIEREN",
                 "auth_admin": "Admin-Badge scannen für Protokolle.",
                 "auth_settings": "Admin-Badge scannen für Einstellungen.",
@@ -1341,23 +1352,58 @@ class KioskApp(tk.Tk):
         lang_cb.set("🇺🇸 English" if self.current_lang == "EN" else "🇩🇪 Deutsch")
         lang_cb.bind("<<ComboboxSelected>>", lambda e: self._update_lang(lang_cb.get()))
 
-        # 2. Screen Timeout
-        time_cb = add_setting(t["settings_timeout"], ttk.Combobox,
-                              values=["30 Seconds", "1 Minute", "5 Minutes", "Never"],
-                              state="readonly", width=15)
-        time_cb.set(self.current_timeout_label)
-        time_cb.bind("<<ComboboxSelected>>", lambda e: self._update_timeout(time_cb.get()))
+        # 2. Terminal Name
+        name_row = tk.Frame(inner, bg="#131b2e", height=60)
+        name_row.pack(fill="x", pady=10, padx=20)
+        name_row.pack_propagate(False)
+        tk.Label(name_row, text=t["settings_terminal_name"],
+                 font=(FONT_FAMILY, 12, "bold"), bg="#131b2e", fg="#f8fafc").pack(side="left")
+        name_var = tk.StringVar(value=self.terminal_name)
+        name_entry = tk.Entry(name_row, textvariable=name_var, font=(FONT_FAMILY, 11),
+                              bg="#0f1929", fg="#f8fafc", insertbackground="#f8fafc",
+                              relief="flat", width=18, bd=4)
+        name_entry.pack(side="right", padx=5)
+        name_entry.bind("<FocusOut>", lambda e: setattr(self, "terminal_name", name_var.get().strip()))
+        name_entry.bind("<Return>",   lambda e: setattr(self, "terminal_name", name_var.get().strip()))
 
-        # 3. Brightness
-        bright_row = tk.Frame(inner, bg="#131b2e", height=60)
-        bright_row.pack(fill="x", pady=10, padx=20)
-        bright_row.pack_propagate(False)
-        tk.Label(bright_row, text=t["settings_brightness"], font=(FONT_FAMILY, 12, "bold"), bg="#131b2e", fg="#f8fafc").pack(side="left")
-        scale = ttk.Scale(bright_row, from_=10, to=100, orient="horizontal", command=lambda v: self._update_brightness(v))
-        scale.set(self.current_brightness)
-        scale.pack(side="right", fill="x", expand=True, padx=(40, 10))
+        # 3. Scan Cooldown
+        _cooldown_map = {"1s": 1.0, "2s": 2.0, "3s": 3.0, "5s": 5.0}
+        _cooldown_rev = {v: k for k, v in _cooldown_map.items()}
+        cool_cb = add_setting(t["settings_scan_cooldown"], ttk.Combobox,
+                              values=list(_cooldown_map.keys()), state="readonly", width=8)
+        cool_cb.set(_cooldown_rev.get(self.scan_cooldown_s, "2s"))
+        cool_cb.bind("<<ComboboxSelected>>",
+                     lambda e: setattr(self, "scan_cooldown_s", _cooldown_map[cool_cb.get()]))
 
-        # 4. Network Info (expanded)
+        # 4. Sound on Scan (toggle button)
+        sound_row = tk.Frame(inner, bg="#131b2e", height=60)
+        sound_row.pack(fill="x", pady=10, padx=20)
+        sound_row.pack_propagate(False)
+        tk.Label(sound_row, text=t["settings_sound"],
+                 font=(FONT_FAMILY, 12, "bold"), bg="#131b2e", fg="#f8fafc").pack(side="left")
+        sound_state = tk.BooleanVar(value=self.sound_enabled)
+        def _toggle_sound():
+            sound_state.set(not sound_state.get())
+            self.sound_enabled = sound_state.get()
+            _sound_btn_lbl.config(text=t["sound_on"] if self.sound_enabled else t["sound_off"],
+                                  fg=self.COLORS["success"] if self.sound_enabled else self.COLORS["subtext"])
+        _sound_btn_lbl = tk.Label(sound_row,
+                                  text=t["sound_on"] if self.sound_enabled else t["sound_off"],
+                                  font=(FONT_FAMILY, 11, "bold"),
+                                  bg="#1e293b", fg=self.COLORS["success"] if self.sound_enabled else self.COLORS["subtext"],
+                                  padx=18, pady=6, cursor="hand2")
+        _sound_btn_lbl.pack(side="right", padx=5)
+        _sound_btn_lbl.bind("<Button-1>", lambda e: _toggle_sound())
+
+        # 5. Sync Interval
+        _sync_map = {"30s": 30000, "1 min": 60000, "5 min": 300000}
+        _sync_rev  = {v: k for k, v in _sync_map.items()}
+        sync_cb = add_setting(t["settings_sync"], ttk.Combobox,
+                              values=list(_sync_map.keys()), state="readonly", width=8)
+        sync_cb.set(_sync_rev.get(self.sync_interval_ms, "1 min"))
+        sync_cb.bind("<<ComboboxSelected>>",
+                     lambda e: setattr(self, "sync_interval_ms", _sync_map[sync_cb.get()]))
+
         net_section_label = tk.Frame(inner, bg="#131b2e", height=30)
         net_section_label.pack(fill="x", padx=20, pady=(14, 2))
         net_section_label.pack_propagate(False)
@@ -1374,7 +1420,28 @@ class KioskApp(tk.Tk):
             tk.Label(row, text=value, font=(FONT_FAMILY, 10, "bold"), bg="#0f1929",
                      fg=color).pack(side="right", padx=10)
 
-        # 5. Save Button
+        # 7. Terminal Info (read-only)
+        info_section = tk.Frame(inner, bg="#131b2e", height=30)
+        info_section.pack(fill="x", padx=20, pady=(14, 2))
+        info_section.pack_propagate(False)
+        tk.Label(info_section, text=t["settings_info"],
+                 font=(FONT_FAMILY, 12, "bold"), bg="#131b2e", fg="#f8fafc").pack(side="left")
+        counts = self.scan_queue.status_counts()
+        for lbl_txt, val_txt, col in [
+            ("Version",      "1.0.0",                        self.COLORS["subtext"]),
+            ("Total sent",   str(counts.get("synced",  0)),  self.COLORS["success"]),
+            ("Pending sync", str(counts.get("pending", 0)),  self.COLORS["warning"]),
+            ("Failed",       str(counts.get("failed",  0)),  self.COLORS["error"]),
+        ]:
+            ir = tk.Frame(inner, bg="#0f1929", height=44)
+            ir.pack(fill="x", pady=2, padx=20)
+            ir.pack_propagate(False)
+            tk.Label(ir, text=lbl_txt, font=(FONT_FAMILY, 10), bg="#0f1929",
+                     fg=self.COLORS["subtext"]).pack(side="left", padx=10)
+            tk.Label(ir, text=val_txt, font=(FONT_FAMILY, 10, "bold"), bg="#0f1929",
+                     fg=col).pack(side="right", padx=10)
+
+        # 8. Save Button
         save_btn_row = tk.Frame(inner, bg="#131b2e", height=80)
         save_btn_row.pack(fill="x", pady=20, padx=20)
         RoundedButton(
@@ -1396,17 +1463,21 @@ class KioskApp(tk.Tk):
                 with open(self.settings_path, "r") as f:
                     return json.load(f)
         except: pass
-        return {"lang": "EN", "brightness": 80, "timeout_ms": 60000}
+        return {"lang": "EN", "terminal_name": "", "scan_cooldown": 2.0,
+                "sound": False, "sync_interval_ms": 60000, "timeout_ms": 60000}
 
     def _save_settings_to_disk(self):
         self.settings = {
-            "lang": self.current_lang,
-            "brightness": self.current_brightness,
-            "timeout_ms": self.IDLE_TIMEOUT_MS
+            "lang":             self.current_lang,
+            "terminal_name":    self.terminal_name,
+            "scan_cooldown":    self.scan_cooldown_s,
+            "sound":            self.sound_enabled,
+            "sync_interval_ms": self.sync_interval_ms,
+            "timeout_ms":       self.IDLE_TIMEOUT_MS,
         }
         try:
             with open(self.settings_path, "w") as f:
-                json.dump(self.settings, f)
+                json.dump(self.settings, f, indent=2)
             t = self.TRANSLATIONS[self.current_lang]
             self._show_info_screen("\u2713", t["save_success"], self.COLORS["success"])
         except Exception as e:
@@ -1432,11 +1503,6 @@ class KioskApp(tk.Tk):
                 if isinstance(w, RoundedButton):
                     w.text = t["btn_status"]
                     w._draw(w.normal_bg)
-
-    def _update_timeout(self, val):
-        mapping = {"30 Seconds": 30000, "1 Minute": 60000, "5 Minutes": 300000, "Never": 3600000,
-                   "30 Sekunden": 30000, "1 Minute": 60000, "5 Minuten": 300000, "Nie": 3600000}
-        self.IDLE_TIMEOUT_MS = mapping.get(val, 60000)
 
     def _get_network_info(self):
         """Return list of (label, value, color) tuples describing current network state."""
