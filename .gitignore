@@ -22,3 +22,4 @@ handover_report.md
 Website/*
 !Website/employees.json
 !Website/rfid_api.php
+!Website/terminal_serials.example.json

@@ -3,7 +3,7 @@ Startup health checks before the main RFID loop or kiosk UI starts.
 
 Runs three steps in order: (1) RC522 SPI sanity via the version register, (2) Linux network link state
 plus a quick internet TCP probe, (3) reachability of the configured auth URL with a deliberate bad
-secret (expect HTTP 401). GUI mode can pass ``on_step`` to animate a splash screen.
+API key (expect HTTP 401). GUI mode can pass ``on_step`` to animate a splash screen.
 
 Interactive hardware test (version register + live tag loop, formerly ``test_hardware.py``)::
 
@@ -379,29 +379,29 @@ def check_server_time(emit: OnStep = None) -> Optional[datetime.datetime]:
 
 def check_auth_endpoint_expect_401(emit: OnStep = None) -> None:
     """
-    POST invalid credentials to the login URL — success means we got a live app that rejects bad secrets.
+    POST invalid credentials to the login URL — success means we got a live app that rejects bad API keys.
 
     Raises:
-        RuntimeError: On connection errors or if HTTP 200 somehow accepts the probe secret.
+        RuntimeError: On connection errors or if HTTP 200 somehow accepts the probe API key.
 
     Args:
         emit: Optional UI callback.
     """
     if emit:
         emit("server", "running", "")
-    payload = {"device_id": config.DEVICE_ID, "secret": "__boot_probe_invalid__"}
+    payload = {"device_id": config.DEVICE_ID, "api_key": "__boot_probe_invalid__"}
     try:
         r = requests.post(config.AUTH_URL, json=payload, timeout=12.0)
     except requests.exceptions.RequestException as e:
         raise RuntimeError(f"Auth endpoint unreachable ({config.AUTH_URL}): {e}") from e
     if r.status_code == 401:
-        logger.info("Server auth endpoint: OK (401 on invalid secret as expected).")
+        logger.info("Server auth endpoint: OK (401 on invalid API key as expected).")
         if emit:
-            emit("server", "ok", "Auth endpoint OK (server rejected bad secret)")
+            emit("server", "ok", "Auth endpoint OK (server rejected bad API key)")
         return
     if r.status_code == 200:
         raise RuntimeError(
-            "Auth endpoint accepted invalid boot probe secret (HTTP 200). "
+            "Auth endpoint accepted invalid boot probe API key (HTTP 200). "
             "Check SERVER_URL / AUTH_ENDPOINT and server configuration."
         )
     logger.warning(

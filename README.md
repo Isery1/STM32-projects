@@ -13,6 +13,7 @@ Raspberry Pi RFID time client (`RFID_Pi/`) and PHP backend files for the web ser
 | `RFID_Pi/` | Python app: scanning, auth, kiosk GUI, boot checks |
 | `Website/rfid_api.php` | API, punch log, dashboard, JWT auth |
 | `Website/employees.json` | Optional badge UID → display name |
+| `Website/terminal_serials.example.json` | Example one-time terminal serial registry |
 
 ## Branches
 
@@ -22,6 +23,6 @@ Raspberry Pi RFID time client (`RFID_Pi/`) and PHP backend files for the web ser
 ## Quick links
 
 - Pi setup: see `RFID_Pi/README.md` and `RFID_Pi/.env.example`.
-- Server: upload `rfid_api.php` and `employees.json`; set env `RFID_APP_TZ` if needed.
+- Server: production uses `https://api.zk-digital.at/backend-api` with the database-backed terminal tables. `Website/rfid_api.php` remains a local/mock backend; for local testing, copy `Website/terminal_serials.example.json` to `Website/terminal_serials.json` and set the Pi `TERMINAL_SERIAL` to the pending serial.
 
 Repository: [gitlab.com/zk-digital-group/manageio-terminal](https://gitlab.com/zk-digital-group/manageio-terminal).

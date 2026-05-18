@@ -15,9 +15,6 @@
 // Server timezone for “today”, punch dates, and worked-time totals (PHP date_*)
 date_default_timezone_set(getenv('RFID_APP_TZ') ?: 'Europe/Vienna');
 
-// Global Shared Secret used to enroll and authorize ANY device
-$GLOBAL_SHARED_SECRET = "Test123";
-
 $JWT_SECRET_KEY = "super-secret-random-signing-key-123";
 
 // File where scans will be stored
@@ -25,6 +22,8 @@ $LOG_FILE = __DIR__ . '/scans.log';
 
 // File where dynamic device registries are stored
 $DEVICES_FILE = __DIR__ . '/devices.json';
+// File where server-generated terminal serials are stored until first enrollment
+$TERMINAL_SERIALS_FILE = __DIR__ . '/terminal_serials.json';
 // Optional: map RFID uid -> display name for greetings & dashboard (not deleted by Clear Logs)
 $EMPLOYEES_FILE = __DIR__ . '/employees.json';
 // =================================================
@@ -86,6 +85,47 @@ function load_devices($file) {
  */
 function save_devices($file, $data) {
     file_put_contents($file, json_encode($data, JSON_PRETTY_PRINT), LOCK_EX);
+}
+
+/**
+ * Load released terminal serials. Keys may be raw serials for local testing or sha256(serial) hashes.
+ *
+ * @param string $file Absolute path to terminal_serials.json.
+ * @return array<string, array<string, mixed>>
+ */
+function load_terminal_serials($file) {
+    if (!file_exists($file)) return [];
+    $raw = @file_get_contents($file);
+    return json_decode($raw, true) ?? [];
+}
+
+/**
+ * Persist terminal serial registry updates after successful enrollment.
+ *
+ * @param string $file Path to terminal_serials.json.
+ * @param array $data Full serial map to write.
+ */
+function save_terminal_serials($file, $data) {
+    file_put_contents($file, json_encode($data, JSON_PRETTY_PRINT), LOCK_EX);
+}
+
+/**
+ * Hash a serial or API key before storing or comparing it.
+ *
+ * @param string $value Secret value.
+ * @return string Hex sha256 hash.
+ */
+function hash_terminal_secret($value) {
+    return hash('sha256', trim((string)$value));
+}
+
+/**
+ * Generate a new high-entropy terminal API key for one physical terminal.
+ *
+ * @return string API key shown once to the enrolling terminal.
+ */
+function generate_terminal_api_key() {
+    return 'mio_test_' . bin2hex(random_bytes(32));
 }
 
 /**
@@ -559,7 +599,6 @@ function touch_device_last_seen($devicesFile, $deviceId, $when) {
         ];
     } else {
         $devices[$deviceId]['last_seen'] = $when;
-        $devices[$deviceId]['status'] = 'approved';
     }
     save_devices($devicesFile, $devices);
 }
@@ -647,46 +686,178 @@ $input = json_decode(file_get_contents('php://input'), true) ?? [];
 
 // ------------------ API ROUTES ------------------
 
-// 1. AUTHENTICATION ENDPOINT
+// 1a. TERMINAL ENROLLMENT ENDPOINT
+if ($action === 'enroll') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(["error" => "Method Not Allowed"]);
+        exit;
+    }
+
+    $serial = trim((string)($input['serial'] ?? ''));
+    $req_id = trim((string)($input['device_id'] ?? ''));
+    if ($serial === '' || $req_id === '') {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "error_code" => "bad_request",
+            "message" => "serial and device_id are required."
+        ]);
+        exit;
+    }
+
+    $serials = load_terminal_serials($TERMINAL_SERIALS_FILE);
+    $serialHash = hash_terminal_secret($serial);
+    $serialKey = null;
+    $serialRecord = null;
+    foreach ($serials as $key => $record) {
+        if ($key === $serial || $key === $serialHash || (($record['serial_hash'] ?? '') === $serialHash)) {
+            $serialKey = $key;
+            $serialRecord = is_array($record) ? $record : [];
+            break;
+        }
+    }
+
+    if ($serialRecord === null) {
+        http_response_code(404);
+        echo json_encode([
+            "success" => false,
+            "error_code" => "unknown_serial",
+            "message" => "This terminal serial is not registered."
+        ]);
+        exit;
+    }
+
+    $serialStatus = strtolower((string)($serialRecord['status'] ?? ''));
+    if ($serialStatus === 'revoked') {
+        http_response_code(403);
+        echo json_encode([
+            "success" => false,
+            "error_code" => "serial_revoked",
+            "message" => "This terminal serial has been revoked."
+        ]);
+        exit;
+    }
+    if ($serialStatus === 'enrolled') {
+        http_response_code(409);
+        echo json_encode([
+            "success" => false,
+            "error_code" => "serial_already_enrolled",
+            "message" => "This terminal serial has already been used."
+        ]);
+        exit;
+    }
+    if (!empty($serialRecord['expires_at']) && strtotime((string)$serialRecord['expires_at']) < time()) {
+        http_response_code(410);
+        echo json_encode([
+            "success" => false,
+            "error_code" => "serial_expired",
+            "message" => "This enrollment serial has expired."
+        ]);
+        exit;
+    }
+    if (!in_array($serialStatus, ['pending', 'released', 'available'], true)) {
+        http_response_code(403);
+        echo json_encode([
+            "success" => false,
+            "error_code" => "serial_not_released",
+            "message" => "This terminal is not released for enrollment."
+        ]);
+        exit;
+    }
+
+    $now = date('Y-m-d H:i:s');
+    $apiKey = generate_terminal_api_key();
+    $devices = load_devices($DEVICES_FILE);
+    $devices[$req_id] = array_merge($devices[$req_id] ?? [], [
+        "status" => "approved",
+        "serial_hash" => $serialHash,
+        "api_key_hash" => hash_terminal_secret($apiKey),
+        "terminal_name" => $serialRecord['terminal_name'] ?? $req_id,
+        "app_version" => $input['app_version'] ?? '',
+        "first_seen" => $devices[$req_id]['first_seen'] ?? $now,
+        "last_seen" => $now,
+        "enrolled_at" => $now,
+        "api_key_created_at" => $now,
+    ]);
+    save_devices($DEVICES_FILE, $devices);
+
+    $serialRecord['status'] = 'ENROLLED';
+    $serialRecord['serial_hash'] = $serialHash;
+    $serialRecord['device_id'] = $req_id;
+    $serialRecord['enrolled_at'] = $now;
+    $serials[$serialKey] = $serialRecord;
+    save_terminal_serials($TERMINAL_SERIALS_FILE, $serials);
+
+    http_response_code(201);
+    echo json_encode([
+        "success" => true,
+        "device_id" => $req_id,
+        "terminal_name" => $devices[$req_id]['terminal_name'],
+        "api_key" => $apiKey,
+        "message" => "Terminal enrolled."
+    ]);
+    exit;
+}
+
+// 1b. AUTHENTICATION ENDPOINT
 if ($action === 'login') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         http_response_code(405);
         echo json_encode(["error" => "Method Not Allowed"]);
         exit;
     }
-    
-    $req_id = $input['device_id'] ?? '';
-    $req_secret = $input['secret'] ?? '';
-    
-    // 1. Global Key Check First
-    if ($req_secret !== $GLOBAL_SHARED_SECRET || empty($req_id)) {
-        http_response_code(401);
-        echo json_encode(["error" => "Unauthorized: Invalid credentials"]);
+
+    $req_id = trim((string)($input['device_id'] ?? ''));
+    $req_api_key = trim((string)($input['api_key'] ?? ''));
+    if ($req_id === '' || $req_api_key === '') {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "error_code" => "bad_request",
+            "message" => "device_id and api_key are required."
+        ]);
         exit;
     }
-    
-    // 2. Device registry: shared secret already validated — register or refresh and issue JWT
+
     $devices = load_devices($DEVICES_FILE);
-    $now = date('Y-m-d H:i:s');
-    if (!isset($devices[$req_id])) {
-        $devices[$req_id] = [
-            "status" => "approved",
-            "first_seen" => $now,
-            "last_seen" => $now
-        ];
-    } else {
-        $devices[$req_id]['last_seen'] = $now;
-        $devices[$req_id]['status'] = 'approved';
+    if (
+        !isset($devices[$req_id]['api_key_hash']) ||
+        !hash_equals((string)$devices[$req_id]['api_key_hash'], hash_terminal_secret($req_api_key))
+    ) {
+        http_response_code(401);
+        echo json_encode([
+            "success" => false,
+            "error_code" => "invalid_credentials",
+            "message" => "Invalid terminal credentials."
+        ]);
+        exit;
     }
+
+    $status = strtolower((string)($devices[$req_id]['status'] ?? 'approved'));
+    if ($status !== 'approved') {
+        http_response_code(403);
+        echo json_encode([
+            "success" => false,
+            "error_code" => "terminal_disabled",
+            "message" => "This terminal has been disabled."
+        ]);
+        exit;
+    }
+
+    $now = date('Y-m-d H:i:s');
+    $devices[$req_id]['last_seen'] = $now;
+    $devices[$req_id]['app_version'] = $input['app_version'] ?? ($devices[$req_id]['app_version'] ?? '');
     save_devices($DEVICES_FILE, $devices);
-    
+
     $token = generate_jwt($req_id, $JWT_SECRET_KEY);
     echo json_encode([
         "success" => true,
+        "access_token" => $token,
         "token" => $token,
+        "token_type" => "Bearer",
         "expires_in" => 3600
     ]);
-
     exit;
 }
 
@@ -1277,7 +1448,7 @@ if ($action === 'dashboard') {
                 <?php if (empty($registeredDevices)): ?>
                     <div class="empty-state" id="device-empty" style="padding: 40px 20px;">
                         <h3 style="font-size: 1rem;">No hardware devices seen yet</h3>
-                        <p style="margin-top: 6px; font-size: 0.9rem; color: var(--subtext);">Run the Pi client (or mock) with the correct shared secret; devices appear here after their first login.</p>
+                        <p style="margin-top: 6px; font-size: 0.9rem; color: var(--subtext);">Release a terminal serial, then run the Pi client; devices appear here after enrollment and login.</p>
                     </div>
                 <?php else: ?>
                     <table>

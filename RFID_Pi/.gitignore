@@ -2,6 +2,7 @@
 
 # Secrets & local config (use .env.example as a template)
 .env
+.terminal_api_key
 
 # Python
 venv/

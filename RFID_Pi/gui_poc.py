@@ -29,23 +29,23 @@ FONT_FAMILY = "DejaVu Sans"
 DISPLAY_W, DISPLAY_H = 800, 480
 PAD_X = 12
 PAD_Y = 6
-FONT_CLOCK = 58
-FONT_DATE = 13
-FONT_INSTRUCTION = 15
-FONT_HEADER_TITLE = 13
-FONT_HEADER_STATUS = 10
-FONT_OVERLAY_TITLE = 22
-FONT_OVERLAY_BODY = 12
+FONT_CLOCK = 76
+FONT_DATE = 15
+FONT_INSTRUCTION = 11
+FONT_HEADER_TITLE = 15
+FONT_HEADER_STATUS = 12
+FONT_OVERLAY_TITLE = 26
+FONT_OVERLAY_BODY = 14
 FONT_BOOT_TITLE = 20
 FONT_BOOT_STEP = 14
 FONT_BOOT_DETAIL = 12
-FONT_BUTTON = 11
-OVERLAY_WRAP = 720
-FOOTER_PAYOUTSIDE = 12
-FOOTER_PADBOTTOM = 10
+FONT_BUTTON = 14
+OVERLAY_WRAP = 680
+FOOTER_PAYOUTSIDE = 0
+FOOTER_PADBOTTOM = 0
 BUTTON_RADIUS = 10
 IDLE_RETURN_MS = 10_000
-SIDEBAR_W = 90
+SIDEBAR_W = 72
 
 logging.basicConfig(
     level=logging.INFO,
@@ -236,26 +236,29 @@ class KioskApp(tk.Tk):
         if config.KIOSK_FULLSCREEN:
             self.attributes("-fullscreen", True)
             self.attributes("-topmost", True)
-            self.bind("<Control-q>", lambda _event: self._on_close())
         self._closing = False
+        self._bind_exit_shortcuts()
         self.defer_boot_sequence = defer_boot_sequence
 
         self.COLORS = {
-            "bg": "#0a0f1d",
-            "sidebar": "#0d1425",
-            "sidebar_active": "#1e293b",
-            "surface": "#0a0f1d",
-            "card": "#131b2e",
-            "card_border": "#1e293b",
-            "text": "#f8fafc",
-            "accent": "#8b5cf6",
-            "success": "#10b981",
+            "bg": "#111318",
+            "sidebar": "#0d0f13",
+            "sidebar_active": "#281850",
+            "surface": "#111318",
+            "card": "#1c1f28",
+            "card_border": "#23252b",
+            "text": "#e6e6eb",
+            "accent": "#7c3aed",
+            "success": "#4ade80",
+            "success_dim": "#143c23",
             "warning": "#fbbf24",
-            "subtext": "#94a3b8",
-            "muted": "#64748b",
-            "error": "#fb7185",
-            "button": "#8b5cf6",
-            "status_bg": "#132328",
+            "warning_dim": "#3c2d0a",
+            "subtext": "#a0a0a8",
+            "muted": "#64646c",
+            "error": "#f87171",
+            "error_dim": "#461414",
+            "button": "#7c3aed",
+            "status_bg": "#143c23",
         }
 
         # Session-persistent settings (load from file)
@@ -271,10 +274,10 @@ class KioskApp(tk.Tk):
 
         self.TRANSLATIONS = {
             "EN": {
-                "clock_instr": "●  TAP BADGE TO CLOCK IN/OUT",
-                "clock_instr_syncing": "●  SYNCING {} SAVED STAMPS…",
-                "clock_instr_offline": "●  OFFLINE MODE - BADGE SCAN ACTIVE",
-                "clock_instr_offline_saved": "●  OFFLINE - {} STAMPS SAVED",
+                "clock_instr": "TAP BADGE TO CLOCK IN/OUT",
+                "clock_instr_syncing": "SYNCING {} SAVED STAMPS…",
+                "clock_instr_offline": "OFFLINE MODE - BADGE SCAN ACTIVE",
+                "clock_instr_offline_saved": "OFFLINE - {} STAMPS SAVED",
                 "btn_status": "Check my current status",
                 "nav_home": "HOME",
                 "nav_user": "USER",
@@ -308,10 +311,10 @@ class KioskApp(tk.Tk):
                 "save_success": "Settings saved and applied.",
             },
             "DE": {
-                "clock_instr": "●  BADGE TIPPEN ZUM EIN/AUSSTEMPELN",
-                "clock_instr_syncing": "●  {} STEMPEL WERDEN SYNCHRONISIERT…",
-                "clock_instr_offline": "●  OFFLINE-MODUS - BADGE-SCAN AKTIV",
-                "clock_instr_offline_saved": "●  OFFLINE - {} STEMPEL GESPEICHERT",
+                "clock_instr": "BADGE TIPPEN ZUM EIN/AUSSTEMPELN",
+                "clock_instr_syncing": "{} STEMPEL WERDEN SYNCHRONISIERT…",
+                "clock_instr_offline": "OFFLINE-MODUS - BADGE-SCAN AKTIV",
+                "clock_instr_offline_saved": "OFFLINE - {} STEMPEL GESPEICHERT",
                 "btn_status": "Status überprüfen",
                 "nav_home": "HOME",
                 "nav_user": "BENUTZER",
@@ -358,6 +361,15 @@ class KioskApp(tk.Tk):
             return
 
         self._complete_initialization_after_boot()
+
+    def _bind_exit_shortcuts(self):
+        """Bind emergency exit shortcuts globally so focused child widgets cannot swallow them."""
+        def close_from_shortcut(_event):
+            self._on_close()
+            return "break"
+
+        for sequence in ("<Control-q>", "<Control-Q>"):
+            self.bind_all(sequence, close_from_shortcut)
 
     def _build_boot_screen(self):
         """Lay out the pre-flight checklist labels before hardware and network are touched."""
@@ -536,6 +548,7 @@ class KioskApp(tk.Tk):
         self.update_clock()
 
         self.after(2000, self._poll_auth_beacon)
+        self.after(2500, self._send_backend_boot_check)
 
         hb_ms = max(5000, int(config.HEARTBEAT_INTERVAL_SECONDS * 1000))
         self.after(1000, self._sync_pending_async)
@@ -543,6 +556,22 @@ class KioskApp(tk.Tk):
 
         self._rfid_thread = threading.Thread(target=self._rfid_listen_loop, daemon=True)
         self._rfid_thread.start()
+
+    def _send_backend_boot_check(self):
+        """Report successful kiosk boot to the authenticated backend without blocking the UI."""
+        if self._closing or not self.winfo_exists():
+            return
+
+        def worker():
+            self.api_session.send_boot_check(
+                hardware={
+                    "rfid_reader": "mock" if self._is_mock_hw else "mfrc522",
+                    "mode": "kiosk",
+                    "display": f"{DISPLAY_W}x{DISPLAY_H}",
+                }
+            )
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _schedule_heartbeat(self):
         """Recurring timer: send heartbeat and retry queued scans; reschedules itself."""
@@ -563,7 +592,7 @@ class KioskApp(tk.Tk):
             summary = {"uploaded": 0, "failed": 0, "pending": self.scan_queue.pending_count(), "last_error": ""}
             try:
                 if send_heartbeat:
-                    self.api_session.send_heartbeat()
+                    self.api_session.send_heartbeat(pending_offline_stamps=self.scan_queue.pending_count())
                 summary = self.scan_queue.sync_pending(self.api_session)
             finally:
                 try:
@@ -622,6 +651,19 @@ class KioskApp(tk.Tk):
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
 
+        # Logo mark at top of sidebar
+        logo_bar = tk.Frame(self.sidebar, bg=self.COLORS["sidebar"], height=48)
+        logo_bar.pack(fill="x")
+        logo_bar.pack_propagate(False)
+        tk.Label(
+            logo_bar, text="M",
+            font=(FONT_FAMILY, 16, "bold"),
+            bg=self.COLORS["sidebar"],
+            fg="#a78bfa",
+        ).pack(expand=True)
+        # Thin divider
+        tk.Frame(self.sidebar, bg="#23252b", height=1).pack(fill="x")
+
         self._add_nav_item("home", "home", "Home", self.revert_to_rest, active=True)
         self._add_nav_item("user", "user", "User", self._open_user_panel)
         self._add_nav_item("admin", "admin", "Admin", lambda: self.action_button_clicked("ADMIN"))
@@ -633,101 +675,132 @@ class KioskApp(tk.Tk):
         self.main_area = tk.Frame(self, bg=self.COLORS["bg"])
         self.main_area.pack(side="right", fill="both", expand=True)
 
-        self.header = tk.Frame(self.main_area, bg=self.COLORS["surface"], highlightthickness=1, highlightbackground="#182036")
+        self.header = tk.Frame(self.main_area, bg=self.COLORS["surface"], highlightthickness=1, highlightbackground="#23252b")
         self.header.pack(side="top", fill="x")
 
         hdr_inner = tk.Frame(self.header, bg=self.COLORS["surface"])
-        hdr_inner.pack(fill="x", padx=18, pady=8)
+        hdr_inner.pack(fill="x", padx=18, pady=0)
+        hdr_inner.configure(height=48)
+        hdr_inner.pack_propagate(False)
 
         tk.Label(
             hdr_inner,
             text="manageIO",
-            font=(FONT_FAMILY, 15, "bold"),
+            font=(FONT_FAMILY, FONT_HEADER_TITLE, "bold"),
             bg=self.COLORS["surface"],
-            fg="#e9d5ff",
-        ).pack(side="left")
+            fg="#e6e6eb",
+        ).pack(side="left", pady=12)
 
         # Pill-shaped status
-        status_pill = tk.Frame(hdr_inner, bg=self.COLORS["status_bg"])
-        status_pill.pack(side="right")
-        self.status_beacon = tk.Label(
-            status_pill,
-            text="● ONLINE",
-            font=(FONT_FAMILY, 9, "bold"),
+        self.status_pill = tk.Frame(hdr_inner, bg=self.COLORS["status_bg"])
+        self.status_pill.pack(side="right", pady=12, ipady=3, ipadx=6)
+        self.status_dot = tk.Label(
+            self.status_pill, text="●",
+            font=(FONT_FAMILY, 8),
             bg=self.COLORS["status_bg"],
             fg=self.COLORS["success"],
-            padx=12,
-            pady=4,
         )
-        self.status_beacon.pack()
+        self.status_dot.pack(side="left", padx=(4, 0))
+        self.status_beacon = tk.Label(
+            self.status_pill,
+            text="Online",
+            font=(FONT_FAMILY, FONT_HEADER_STATUS, "bold"),
+            bg=self.COLORS["status_bg"],
+            fg=self.COLORS["success"],
+            padx=4,
+        )
+        self.status_beacon.pack(side="left")
 
         self.body = tk.Frame(self.main_area, bg=self.COLORS["bg"])
         self.body.pack(side="top", expand=True, fill="both", padx=20, pady=(12, 12))
 
-        self.rest_frame = tk.Frame(self.body, bg=self.COLORS["surface"])
+        self.rest_frame = tk.Frame(self.body, bg=self.COLORS["bg"])
         self.rest_frame.pack(expand=True, fill="both")
 
-        self.clock_frame = tk.Frame(self.rest_frame, bg=self.COLORS["surface"])
-        self.clock_frame.pack(fill="x", expand=True, pady=(48, 10))
+        # Clock panel
+        self.clock_panel = tk.Frame(
+            self.rest_frame,
+            bg=self.COLORS["card"],
+            highlightbackground=self.COLORS["card_border"],
+            highlightthickness=1,
+        )
+        self.clock_panel.pack(pady=(24, 0), ipadx=30, ipady=18)
+
+        self.clock_frame = tk.Frame(self.clock_panel, bg=self.COLORS["card"])
+        self.clock_frame.pack()
 
         self.lbl_time = tk.Label(
             self.clock_frame,
             text="12:00:00",
-            font=(FONT_FAMILY, 96),
-            bg=self.COLORS["surface"],
-            fg="#e0e7ff",
+            font=(FONT_FAMILY, FONT_CLOCK, "bold"),
+            bg=self.COLORS["card"],
+            fg=self.COLORS["text"],
         )
         self.lbl_time.pack()
 
         self.lbl_date = tk.Label(
             self.clock_frame,
             text="SATURDAY, 16. MAY 2026",
-            font=(FONT_FAMILY, 12, "bold"),
-            bg=self.COLORS["surface"],
+            font=(FONT_FAMILY, FONT_DATE),
+            bg=self.COLORS["card"],
             fg=self.COLORS["subtext"],
         )
         self.lbl_date.pack(pady=(5, 0))
-        # Simulated letter spacing by adding spaces if needed, but the font itself should be clean.
 
-        self.action_row = tk.Frame(self.rest_frame, bg=self.COLORS["surface"])
-        self.action_row.pack(side="bottom", fill="x", pady=(0, 20))
+        # Thin divider inside the panel
+        tk.Frame(self.clock_panel, bg="#23252b", height=1, width=240).pack(pady=(12, 4))
+
+        # Action row
+        self.action_row = tk.Frame(self.rest_frame, bg=self.COLORS["bg"])
+        self.action_row.pack(pady=(20, 0))
 
         # Centered Check Status Button
-        self.btn_status_wrap = tk.Frame(self.action_row, bg=self.COLORS["surface"])
+        self.btn_status_wrap = tk.Frame(self.action_row, bg=self.COLORS["bg"])
         self.btn_status_wrap.pack(expand=True)
         
         RoundedButton(
             self.btn_status_wrap,
             "Check my current status",
             self._check_status_clicked,
-            width=380,
-            height=78,
-            bg="#7c3aed",
+            width=270,
+            height=46,
+            bg=self.COLORS["button"],
             fg="#ffffff",
             active_bg="#6d28d9",
-            border="#7c3aed",
-            font=(FONT_FAMILY, 14, "bold"),
+            border=self.COLORS["button"],
+            font=(FONT_FAMILY, FONT_BUTTON, "bold"),
             icon_type="info",
         ).pack()
 
-        # Sleek Footer Instruction (Replacing the box)
-        self.footer_instruction = tk.Frame(self.main_area, bg="#0d1425", height=42)
-        self.footer_instruction.pack(side="bottom", fill="x")
-        self.footer_instruction.pack_propagate(False)
+        # Sleek Footer Instruction
+        self.footer_instruction = tk.Frame(self.rest_frame, bg=self.COLORS["bg"])
+        self.footer_instruction.pack(side="bottom", fill="x", pady=(0, 20))
 
+        # Tap-hint strip
+        hint_strip = tk.Frame(self.footer_instruction, bg=self.COLORS["bg"])
+        hint_strip.pack()
+        tk.Frame(hint_strip, bg="#23252b", width=60, height=1).pack(side="left", padx=(0, 12), pady=8)
+        tk.Label(
+            hint_strip,
+            text="[=]",
+            font=(FONT_FAMILY, 10),
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["muted"],
+        ).pack(side="left", padx=(0, 6))
         self.lbl_instruction = tk.Label(
-            self.footer_instruction,
-            text="●  TAP BADGE TO CLOCK IN/OUT",
-            font=(FONT_FAMILY, 10, "bold"),
-            bg="#0d1425",
-            fg=self.COLORS["text"],
+            hint_strip,
+            text="TAP BADGE TO CLOCK IN / OUT",
+            font=(FONT_FAMILY, FONT_INSTRUCTION),
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["muted"],
         )
-        self.lbl_instruction.pack(expand=True)
+        self.lbl_instruction.pack(side="left")
+        tk.Frame(hint_strip, bg="#23252b", width=60, height=1).pack(side="left", padx=(12, 0), pady=8)
 
         self.overlay_frame = tk.Frame(self.body, bg=self.COLORS["bg"])
         self.overlay_panel = RoundedPanel(
             self.overlay_frame,
-            bg=self.COLORS["bg"],
+            bg=self.COLORS["card"],
             border=self.COLORS["card_border"],
             radius=18,
         )
@@ -737,9 +810,9 @@ class KioskApp(tk.Tk):
         self.lbl_overlay_title = tk.Label(
             self.overlay_inner,
             text="…",
-            font=(FONT_FAMILY, 28, "bold"),
-            bg=self.COLORS["bg"],
-            fg="#ffffff",
+            font=(FONT_FAMILY, FONT_OVERLAY_TITLE, "bold"),
+            bg=self.COLORS["card"],
+            fg=self.COLORS["text"],
             wraplength=OVERLAY_WRAP,
             justify="center",
         )
@@ -822,7 +895,7 @@ class KioskApp(tk.Tk):
 
     def _check_status_clicked(self):
         """Open status badge prompt only when a server connection is available."""
-        if not self.api_session.is_approved:
+        if not self.api_session.is_approved and not self.api_session.authenticate(silent=True):
             self._show_info_screen(
                 "Status unavailable",
                 "No internet connection right now.\n\nPlease come back later to check your current status.",
@@ -873,13 +946,19 @@ class KioskApp(tk.Tk):
         t = self.TRANSLATIONS[self.current_lang]
         if self.api_session.is_approved:
             if pending_count:
-                self.status_beacon.config(text=f"● Online - syncing {pending_count}", fg=self.COLORS["warning"])
+                self.status_pill.config(bg=self.COLORS["warning_dim"])
+                self.status_dot.config(bg=self.COLORS["warning_dim"], fg=self.COLORS["warning"])
+                self.status_beacon.config(text=f"Online - syncing {pending_count}", bg=self.COLORS["warning_dim"], fg=self.COLORS["warning"])
                 self.lbl_instruction.config(text=t["clock_instr_syncing"].format(pending_count))
             else:
-                self.status_beacon.config(text="● Online", fg=self.COLORS["success"])
+                self.status_pill.config(bg=self.COLORS["status_bg"])
+                self.status_dot.config(bg=self.COLORS["status_bg"], fg=self.COLORS["success"])
+                self.status_beacon.config(text="Online", bg=self.COLORS["status_bg"], fg=self.COLORS["success"])
                 self.lbl_instruction.config(text=t["clock_instr"])
         else:
-            self.status_beacon.config(text="● Offline mode", fg=self.COLORS["warning"])
+            self.status_pill.config(bg=self.COLORS["error_dim"])
+            self.status_dot.config(bg=self.COLORS["error_dim"], fg=self.COLORS["error"])
+            self.status_beacon.config(text="Offline mode", bg=self.COLORS["error_dim"], fg=self.COLORS["error"])
             if pending_count:
                 self.lbl_instruction.config(text=t["clock_instr_offline_saved"].format(pending_count))
             else:
@@ -973,6 +1052,15 @@ class KioskApp(tk.Tk):
                     except ValueError:
                         result = {"success": True}
                     result["queue_pending"] = summary.get("pending", self.scan_queue.pending_count())
+                elif queued_after_sync.get("status") == "rejected" and response_text:
+                    try:
+                        result = json.loads(response_text)
+                    except ValueError:
+                        result = {
+                            "success": False,
+                            "message": queued_after_sync.get("last_sync_error") or "Server rejected this scan.",
+                        }
+                    result["queue_pending"] = summary.get("pending", self.scan_queue.pending_count())
                 else:
                     result = {
                         "success": True,
@@ -981,6 +1069,8 @@ class KioskApp(tk.Tk):
                         "client_local_time": queued["client_local_time"],
                         "queue_pending": summary.get("pending", self.scan_queue.pending_count()),
                     }
+            if pending_context in ("CHECK_STATUS", "FLEXTIME", "HOLIDAY") and result:
+                result["query_kind"] = pending_context
             if pending_context in ("CHECK_STATUS", "FLEXTIME", "HOLIDAY") and not result:
                 result = {
                     "success": False,
@@ -1006,7 +1096,7 @@ class KioskApp(tk.Tk):
 
         ok = bool(result and result.get("success"))
         ev = (result or {}).get("event", "") if ok else ""
-        terminal_msg = (result or {}).get("terminal_message", "") if ok else ""
+        terminal_msg = (result or {}).get("terminal_message") or (result or {}).get("message") or ""
         detail_font = (FONT_FAMILY, FONT_OVERLAY_BODY)
 
         if ok and (result or {}).get("admin_access"):
@@ -1025,8 +1115,13 @@ class KioskApp(tk.Tk):
                 "FLEXTIME": "Flextime unavailable",
                 "HOLIDAY": "Holidays unavailable",
             }.get((result or {}).get("query_kind"), "Information unavailable")
-            color = self.COLORS["warning"]
-            details = "The server did not answer. Please try again when the terminal is online."
+            if (result or {}).get("http_status") == 404:
+                title = "Badge not registered"
+                color = self.COLORS["error"]
+                details = terminal_msg or "This badge is not assigned to a user."
+            else:
+                color = self.COLORS["warning"]
+                details = terminal_msg or "The server did not answer. Please try again when the terminal is online."
             detail_font = (FONT_FAMILY, FONT_OVERLAY_BODY + 2, "bold")
         elif ok and (result or {}).get("offline_saved"):
             pending = int((result or {}).get("queue_pending", self.scan_queue.pending_count()))
@@ -1089,12 +1184,17 @@ class KioskApp(tk.Tk):
                 self.after_cancel(self.timeout_timer)
             self.timeout_timer = self.after(5000, self.revert_to_rest)
         else:
-            title = "Couldn’t complete that"
+            if (result or {}).get("http_status") == 404:
+                title = "Badge not registered"
+                details = terminal_msg or "This badge is not assigned to a user."
+            else:
+                title = "Couldn’t complete that"
+                details = (
+                    terminal_msg
+                    or "We couldn’t confirm this with the server.\n\n"
+                    "Please try again in a moment. If it keeps happening, ask an admin to check the terminal."
+                )
             color = self.COLORS["error"]
-            details = (
-                "We couldn’t confirm this with the server.\n\n"
-                "Please try again in a moment. If it keeps happening, ask an admin to check the terminal."
-            )
             detail_font = (FONT_FAMILY, FONT_OVERLAY_BODY + 1, "bold")
 
         self.lbl_overlay_title.config(text=title, fg=color)
@@ -1278,7 +1378,7 @@ class KioskApp(tk.Tk):
             controls,
             "Sync All",
             self._admin_retry_sync,
-            width=260,
+            width=170,
             height=48,
             bg=self.COLORS["sidebar_active"],
             fg=self.COLORS["text"],
@@ -1291,12 +1391,25 @@ class KioskApp(tk.Tk):
             controls,
             "Refresh",
             self._refresh_admin_page,
-            width=260,
+            width=170,
             height=48,
             bg=self.COLORS["sidebar_active"],
             fg=self.COLORS["text"],
             active_bg=self.COLORS["sidebar_active"],
             border=self.COLORS["card_border"],
+            font=(FONT_FAMILY, 10, "bold"),
+        ).pack(side="left", expand=True, padx=5)
+
+        RoundedButton(
+            controls,
+            "Clear Local",
+            self._admin_clear_local_stamps,
+            width=170,
+            height=48,
+            bg=self.COLORS["error"],
+            fg="#ffffff",
+            active_bg="#b91c1c",
+            border=self.COLORS["error"],
             font=(FONT_FAMILY, 10, "bold"),
         ).pack(side="left", expand=True, padx=5)
 
@@ -1671,6 +1784,14 @@ class KioskApp(tk.Tk):
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def _admin_clear_local_stamps(self):
+        """Debug button: delete local SQLite scan rows only; server-side stamps are untouched."""
+        removed = self.scan_queue.clear_local_scans()
+        if self.admin_summary_label:
+            self.admin_summary_label.config(text=f"Deleted {removed} local stamp row(s).")
+        self._refresh_admin_page()
+        self._schedule_idle_return()
+
     def _close_admin_page(self):
         """Return from admin page to the normal clock screen."""
         if self.timeout_timer:
@@ -1696,7 +1817,7 @@ class KioskApp(tk.Tk):
         Args:
             action_type: ``CHECK_STATUS`` | ``FLEXTIME`` | ``HOLIDAY`` — forwarded to the query API.
         """
-        if action_type in ("CHECK_STATUS", "FLEXTIME", "HOLIDAY") and not self.api_session.is_approved:
+        if action_type in ("CHECK_STATUS", "FLEXTIME", "HOLIDAY") and not self.api_session.is_approved and not self.api_session.authenticate(silent=True):
             self._show_info_screen(
                 "Not available offline",
                 "No internet connection right now.\n\nPlease come back later.",

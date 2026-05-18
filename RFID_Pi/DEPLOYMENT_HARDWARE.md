@@ -155,13 +155,15 @@ For each terminal, copy `.env.example` to `.env` and set:
 
 ```text
 DEVICE_ID=terminal-lobby-01
-DEVICE_SECRET=<shared-secret-from-server>
-SERVER_URL=https://your-server.example/rfid_api.php?action=
+TERMINAL_SERIAL=<server-generated-pending-serial>
+TERMINAL_API_KEY_FILE=.terminal_api_key
+SERVER_URL=https://api.zk-digital.at/backend-api
 ```
 
 Keep an asset list with:
 
 - `DEVICE_ID`.
+- Enrollment serial status.
 - Physical location.
 - Pi serial number.
 - Ethernet port or switch location.
@@ -221,7 +223,7 @@ Field validation after mounting:
 ## Batch Rollout Notes
 
 - Build one golden SD card image after the first terminal is validated.
-- Clone the image for new terminals, then change only `DEVICE_ID`, Wi-Fi fallback, and local hostname.
+- Clone the image for new terminals, then change `DEVICE_ID`, `TERMINAL_SERIAL`, Wi-Fi fallback, and local hostname. Do not clone an already enrolled `.terminal_api_key` file to another physical terminal.
 - Keep the same enclosure revision for a full batch.
 - When changing the enclosure model, increment the printed revision label and re-run the fit-check print.
 - Keep spare prebuilt RFID harnesses and one spare complete terminal for fast replacement.

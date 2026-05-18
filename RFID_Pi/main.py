@@ -68,6 +68,19 @@ def main(skip_boot_checks: bool = False) -> None:
     reader = SimpleMFRC522()
     api_session = AuthenticatedSession()
     scan_queue = OfflineScanQueue()
+    if not api_session.has_api_key():
+        logger.info(
+            "No stored terminal API key found. First-enrollment payload: %s",
+            json.dumps(api_session.build_enroll_payload(), ensure_ascii=False),
+        )
+    boot_response = api_session.send_boot_check(
+        hardware={
+            "rfid_reader": "mock" if IS_MOCK else "mfrc522",
+            "mode": "headless",
+        }
+    )
+    if boot_response:
+        logger.info("Backend boot check OK: %s", boot_response.get("version_status", "ok"))
 
     # 3. Self-Healing Operational Loop
     last_hb = 0.0
@@ -80,7 +93,7 @@ def main(skip_boot_checks: bool = False) -> None:
 
             now_m = time.monotonic()
             if now_m - last_hb >= config.HEARTBEAT_INTERVAL_SECONDS:
-                if api_session.send_heartbeat():
+                if api_session.send_heartbeat(pending_offline_stamps=scan_queue.pending_count()):
                     logger.debug("Heartbeat OK.")
                 last_hb = now_m
                 sync_summary = scan_queue.sync_pending(api_session)
@@ -108,13 +121,19 @@ def main(skip_boot_checks: bool = False) -> None:
                     if api_session.is_approved:
                         sync_summary = scan_queue.sync_pending(api_session, limit=config.OFFLINE_SYNC_BATCH_SIZE)
                     else:
-                        sync_summary = {"uploaded": 0, "failed": 0, "pending": scan_queue.pending_count()}
+                        sync_summary = {"uploaded": 0, "failed": 0, "rejected": 0, "pending": scan_queue.pending_count()}
                     result = scan_queue.get_by_request_id(queued["request_id"])
                     if result.get("status") == "synced":
                         logger.info(
                             "Scan synced: request_id=%s pending=%s",
                             queued["request_id"],
                             sync_summary["pending"],
+                        )
+                    elif result.get("status") == "rejected":
+                        logger.warning(
+                            "Scan rejected by server: request_id=%s reason=%s",
+                            queued["request_id"],
+                            result.get("last_sync_error") or "unknown",
                         )
                     else:
                         logger.warning(

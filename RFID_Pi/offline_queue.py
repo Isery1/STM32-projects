@@ -128,6 +128,15 @@ class OfflineScanQueue:
             ).fetchall()
         return {str(row["status"]): int(row["n"]) for row in rows}
 
+    def clear_local_scans(self) -> int:
+        """Delete all locally stored scan queue rows for debugging and return the number removed."""
+        with self._connect() as conn:
+            row = conn.execute("SELECT COUNT(*) AS n FROM local_scan_queue").fetchone()
+            count = int(row["n"])
+            conn.execute("DELETE FROM local_scan_queue")
+            conn.execute("DELETE FROM sync_state WHERE key = 'last_sync'")
+        return count
+
     def recent_scans(self, limit: int = 8) -> List[Dict[str, Any]]:
         """Newest local queue rows for admin inspection."""
         with self._connect() as conn:
@@ -143,15 +152,15 @@ class OfflineScanQueue:
         return [dict(row) for row in rows]
 
     def issue_scans(self, limit: int = 8) -> List[Dict[str, Any]]:
-        """Rows likely needing attention: failed retries first, then pending uploads."""
+        """Rows likely needing attention: final rejections, failed retries, then pending uploads."""
         with self._connect() as conn:
             rows = conn.execute(
                 """
                 SELECT id, request_id, uid, client_local_time, status, retry_count, last_sync_error, synced_at_utc
                 FROM local_scan_queue
-                WHERE status IN ('failed', 'pending')
+                WHERE status IN ('rejected', 'failed', 'pending')
                 ORDER BY
-                    CASE status WHEN 'failed' THEN 0 ELSE 1 END,
+                    CASE status WHEN 'rejected' THEN 0 WHEN 'failed' THEN 1 ELSE 2 END,
                     id ASC
                 LIMIT ?
                 """,
@@ -207,6 +216,22 @@ class OfflineScanQueue:
                 (error[:500], utc_now_iso(), request_id),
             )
 
+    def mark_rejected(self, request_id: str, response: Dict[str, Any]) -> None:
+        """Mark a scan as permanently rejected by the server so it is not retried forever."""
+        message = response.get("message") or response.get("terminal_message") or "Server rejected scan"
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE local_scan_queue
+                SET status = 'rejected',
+                    server_response = ?,
+                    last_sync_error = ?,
+                    updated_at_utc = ?
+                WHERE request_id = ?
+                """,
+                (json.dumps(response, ensure_ascii=False), str(message)[:500], utc_now_iso(), request_id),
+            )
+
     def set_state(self, key: str, value: Any) -> None:
         """Persist a small sync/status value."""
         with self._connect() as conn:
@@ -227,18 +252,24 @@ class OfflineScanQueue:
         """
         uploaded = 0
         failed = 0
+        rejected = 0
         last_error = ""
         for row in self.pending_scans(limit=limit):
             payload = {
                 "device_id": row["device_id"],
                 "uid": row["uid"],
-                "client_local_time": row["client_local_time"],
+                "terminal_time": row["client_local_time"],
                 "request_id": row["request_id"],
             }
             result = api_session.send_scan_payload(payload)
             if result and result.get("success"):
                 self.mark_synced(row["request_id"], result)
                 uploaded += 1
+                continue
+            if result and result.get("permanent"):
+                self.mark_rejected(row["request_id"], result)
+                rejected += 1
+                last_error = result.get("message") or "Server rejected scan"
                 continue
             failed += 1
             last_error = "Server unavailable or rejected scan"
@@ -251,9 +282,10 @@ class OfflineScanQueue:
             {
                 "uploaded": uploaded,
                 "failed": failed,
+                "rejected": rejected,
                 "pending": pending,
                 "last_error": last_error,
                 "time": utc_now_iso(),
             },
         )
-        return {"uploaded": uploaded, "failed": failed, "pending": pending, "last_error": last_error}
+        return {"uploaded": uploaded, "failed": failed, "rejected": rejected, "pending": pending, "last_error": last_error}

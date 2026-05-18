@@ -64,15 +64,20 @@ pip3 install -r requirements.txt
 ### 3. Setup Environment variables
 Create a `.env` file in the project directory (e.g. `nano .env`) with at least:
 
-- `SERVER_URL` — e.g. `https://framegeist.at/rfid_api.php?action=`
-- `AUTH_ENDPOINT` — `login`
-- `SCAN_ENDPOINT` — `scan`
-- `HEARTBEAT_ENDPOINT` — `heartbeat` (keeps the device visible as **TERMINAL LIVE** on the dashboard between scans)
-- `QUERY_ENDPOINT` — `query_punch_status` (read-only: status / flex / holiday **without** recording a punch)
+- `SERVER_URL` — `https://api.zk-digital.at/backend-api`
+- `ENROLL_ENDPOINT` — `terminal/enroll` (used once with the terminal serial)
+- `AUTH_ENDPOINT` — `terminal/login`
+- `SCAN_ENDPOINT` — `terminal/stamps`
+- `HEARTBEAT_ENDPOINT` — `terminal/heartbeat` (keeps the device visible as **TERMINAL LIVE** on the dashboard between scans)
+- `BOOT_CHECK_ENDPOINT` — `terminal/boot-check` (authenticated startup event/version check)
+- `QUERY_ENDPOINT` — `terminal/query` (read-only: status / flex / holiday **without** recording a punch)
 - `DEVICE_ID` — unique name for this terminal
-- `DEVICE_SECRET` — must match the PHP `$GLOBAL_SHARED_SECRET` on the server
+- `TERMINAL_SERIAL` — one-time server-generated serial with `PENDING` status for this terminal
+- `TERMINAL_API_KEY_FILE` — local file where the terminal stores the API key after enrollment
 
-Each badge punch is recorded as **CHECK IN** or **CHECK OUT**: the **server** picks the next event from that badge’s history (first scan of the day is IN, then alternating). The client sends `client_local_time` for reference; the log stores server time plus the terminal’s timestamp when provided. **Do not duplicate in/out logic on the client** — it would disagree with the server.
+On first successful connection the Pi sends `TERMINAL_SERIAL` + `DEVICE_ID` to the server, receives a unique API key, and writes it to `TERMINAL_API_KEY_FILE`. Future boots use only `DEVICE_ID` + that API key to receive a short-lived bearer token.
+
+Each badge punch is recorded as **CHECK IN** or **CHECK OUT**: the **server** picks the next event from that badge’s history and stores it in `backend_api.d_stamps`. The client sends `request_id`, `uid`, and `terminal_time`; the server resolves the badge through `backend_api.d_user_badges`, derives the customer from the authenticated terminal, and sets `server_time`. **Do not duplicate in/out logic on the client** — it would disagree with the server.
 
 Optional on the server: edit `Website/employees.json` to map RFID UIDs to names, e.g. `{"12345": "Jane Doe"}`, for personalized messages on the terminal and dashboard.
 
