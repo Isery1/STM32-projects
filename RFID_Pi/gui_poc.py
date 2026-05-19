@@ -21,6 +21,7 @@ from tkinter import ttk
 
 import config
 from auth import AuthenticatedSession
+from i18n import Translator
 from offline_queue import OfflineScanQueue, local_now_iso
 
 FONT_FAMILY = "DejaVu Sans"
@@ -48,6 +49,8 @@ FOOTER_PADBOTTOM = 0
 BUTTON_RADIUS = 10
 IDLE_RETURN_MS = 10_000
 SIDEBAR_W = 72
+SETTINGS_LANG_EN = "English"
+SETTINGS_LANG_DE = "Deutsch"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -286,7 +289,7 @@ class KioskApp(tk.Tk):
         """
         super().__init__()
 
-        self.title("Time clock")
+        self.title("")  # set after translator loads
         self.geometry(f"{DISPLAY_W}x{DISPLAY_H}")
         self.minsize(DISPLAY_W, DISPLAY_H)
         self.maxsize(DISPLAY_W, DISPLAY_H)
@@ -325,88 +328,10 @@ class KioskApp(tk.Tk):
         self.settings = self._load_settings()
 
         self.current_lang = self.settings.get("lang", "EN")
+        self.translator = Translator(self.current_lang)
         self.IDLE_TIMEOUT_MS = self.settings.get("timeout_ms", 60000)
-        self.terminal_name = self.settings.get("terminal_name", "")
-        self.scan_cooldown_s = self.settings.get("scan_cooldown", 2.0)
-        self.sound_enabled = self.settings.get("sound", False)
         self.sync_interval_ms = self.settings.get("sync_interval_ms", 60000)
-
-        self.TRANSLATIONS = {
-            "EN": {
-                "clock_instr": "TAP BADGE TO CLOCK IN/OUT",
-                "clock_instr_syncing": "SYNCING {} SAVED STAMPS…",
-                "clock_instr_offline": "OFFLINE MODE - BADGE SCAN ACTIVE",
-                "clock_instr_offline_saved": "OFFLINE - {} STAMPS SAVED",
-                "btn_status": "Status",
-                "nav_home": "HOME",
-                "nav_user": "USER",
-                "nav_admin": "ADMIN",
-                "nav_settings": "SETTINGS",
-                "settings_title": "TERMINAL SETTINGS",
-                "settings_lang": "System Language",
-                "settings_terminal_name": "Terminal Name",
-                "settings_scan_cooldown": "Scan Cooldown",
-                "settings_sound": "Sound on Scan",
-                "settings_sync": "Sync Interval",
-                "settings_network": "Network Status",
-                "settings_info": "Terminal Info",
-                "settings_save": "SAVE SETTINGS",
-                "sound_on": "ON",
-                "sound_off": "OFF",
-                "auth_title": "AUTHENTICATE",
-                "auth_admin": "Scan admin badge to view terminal logs.",
-                "auth_settings": "Scan admin badge to unlock settings.",
-                "user_title": "What would you like to check?",
-                "user_subtitle_online": "Choose an option, then scan your badge.",
-                "user_subtitle_offline": "No internet connection right now. Please come back later.",
-                "btn_flextime": "Flextime",
-                "btn_holidays": "Holidays",
-                "admin_title": "Admin overview",
-                "admin_unlocked": "Unlocked",
-                "admin_stamps_title": "Stamps that need attention",
-                "admin_all_good": "Everything looks good. No saved stamps need attention.",
-                "admin_sync_btn": "Sync All",
-                "admin_refresh_btn": "Refresh",
-                "save_success": "Settings saved and applied.",
-            },
-            "DE": {
-                "clock_instr": "BADGE TIPPEN ZUM EIN/AUSSTEMPELN",
-                "clock_instr_syncing": "{} STEMPEL WERDEN SYNCHRONISIERT…",
-                "clock_instr_offline": "OFFLINE-MODUS - BADGE-SCAN AKTIV",
-                "clock_instr_offline_saved": "OFFLINE - {} STEMPEL GESPEICHERT",
-                "btn_status": "Status",
-                "nav_home": "HOME",
-                "nav_user": "BENUTZER",
-                "nav_admin": "ADMIN",
-                "nav_settings": "EINSTELLUNGEN",
-                "settings_title": "TERMINAL EINSTELLUNGEN",
-                "settings_lang": "Systemsprache",
-                "settings_terminal_name": "Terminal-Name",
-                "settings_scan_cooldown": "Scan-Wartezeit",
-                "settings_sound": "Ton beim Scannen",
-                "settings_sync": "Sync-Intervall",
-                "settings_network": "Netzwerkstatus",
-                "settings_info": "Terminal-Info",
-                "settings_save": "EINSTELLUNGEN SPEICHERN",
-                "sound_on": "AN",
-                "sound_off": "AUS",
-                "auth_title": "AUTHENTIFIZIEREN",
-                "auth_admin": "Admin-Badge scannen für Protokolle.",
-                "auth_settings": "Admin-Badge scannen für Einstellungen.",
-                "user_title": "Was möchten Sie prüfen?",
-                "user_subtitle_online": "Option wählen, dann Badge scannen.",
-                "user_subtitle_offline": "Keine Internetverbindung. Bitte später versuchen.",
-                "btn_flextime": "Gleitzeit",
-                "btn_holidays": "Urlaub",
-                "admin_title": "Admin-Übersicht",
-                "admin_unlocked": "Entsperrt",
-                "admin_stamps_title": "Stempel mit Handlungsbedarf",
-                "admin_all_good": "Alles in Ordnung. Keine ausstehenden Stempel.",
-                "admin_sync_btn": "Alles Synchronisieren",
-                "admin_refresh_btn": "Aktualisieren",
-                "save_success": "Einstellungen gespeichert.",
-            }
-        }
+        self.title(self.t("window_title"))
 
         self.create_styles()
 
@@ -438,7 +363,7 @@ class KioskApp(tk.Tk):
 
         tk.Label(
             wrap,
-            text="Starting…",
+            text=self.t("boot_starting"),
             font=(FONT_FAMILY, FONT_BOOT_TITLE, "bold"),
             bg=self.COLORS["bg"],
             fg=self.COLORS["text"],
@@ -446,7 +371,7 @@ class KioskApp(tk.Tk):
 
         self._boot_subtitle = tk.Label(
             wrap,
-            text="A quick check before the clock appears.",
+            text=self.t("boot_subtitle"),
             font=(FONT_FAMILY, FONT_BOOT_DETAIL),
             bg=self.COLORS["bg"],
             fg=self.COLORS["subtext"],
@@ -454,10 +379,10 @@ class KioskApp(tk.Tk):
         self._boot_subtitle.pack(pady=(0, 16))
 
         rows = [
-            ("hardware", "RFID reader"),
-            ("network", "Network"),
-            ("time", "Clock time"),
-            ("server", "Time server"),
+            ("hardware", self.t("boot_step_hardware")),
+            ("network", self.t("boot_step_network")),
+            ("time", self.t("boot_step_time")),
+            ("server", self.t("boot_step_server")),
         ]
         for key, title in rows:
             row = tk.Frame(wrap, bg=self.COLORS["bg"])
@@ -472,7 +397,7 @@ class KioskApp(tk.Tk):
             ).pack(fill="x")
             lbl = tk.Label(
                 row,
-                text="Waiting…",
+                text=self.t("boot_waiting"),
                 font=(FONT_FAMILY, FONT_BOOT_DETAIL),
                 anchor="w",
                 bg=self.COLORS["bg"],
@@ -511,22 +436,22 @@ class KioskApp(tk.Tk):
         lbl = self._boot_detail_labels.get(phase)
         if lbl:
             if state == "running":
-                lbl.config(text="Checking…", fg=self.COLORS["warning"])
+                lbl.config(text=self.t("boot_checking"), fg=self.COLORS["warning"])
             elif state == "skip":
-                lbl.config(text=detail or "Not needed on this setup.", fg=self.COLORS["subtext"])
+                lbl.config(text=detail or self.t("boot_not_needed"), fg=self.COLORS["subtext"])
             elif state == "ok":
-                lbl.config(text=detail or "OK", fg=self.COLORS["success"])
+                lbl.config(text=detail or self.t("boot_ok"), fg=self.COLORS["success"])
             elif state == "error":
-                lbl.config(text=detail or "Something went wrong.", fg=self.COLORS["error"])
+                lbl.config(text=detail or self.t("boot_failed"), fg=self.COLORS["error"])
             else:
                 lbl.config(text=detail or state, fg=self.COLORS["subtext"])
         if self._boot_subtitle:
             subtitle = {
-                "hardware": "Reader and wiring",
-                "network": "This device online",
-                "time": "Checking clock time",
-                "server": "Reaching the time server",
-            }.get(phase, "One moment…")
+                "hardware": self.t("boot_phase_hardware"),
+                "network": self.t("boot_phase_network"),
+                "time": self.t("boot_phase_time"),
+                "server": self.t("boot_phase_server"),
+            }.get(phase, self.t("boot_phase_default"))
             self._boot_subtitle.config(text=subtitle, fg=self.COLORS["subtext"])
 
     def _boot_sequence_ok(self):
@@ -535,7 +460,7 @@ class KioskApp(tk.Tk):
             return
         if self._boot_subtitle:
             self._boot_subtitle.config(
-                text="All good — opening the clock.",
+                text=self.t("boot_all_good"),
                 fg=self.COLORS["success"],
             )
         self.after(350, self._finalize_boot_transition)
@@ -559,7 +484,7 @@ class KioskApp(tk.Tk):
             msg = f"[{code}] {msg}"
         if self._boot_subtitle:
             self._boot_subtitle.config(
-                text="Startup stopped — this needs a fix",
+                text=self.t("boot_stopped"),
                 fg=self.COLORS["error"],
             )
         tk.Label(
@@ -573,7 +498,7 @@ class KioskApp(tk.Tk):
         ).pack(pady=(16, 0), anchor="w")
         tk.Label(
             self._boot_wrap,
-            text="Close this window after fixing the issue, then start the app again.",
+            text=self.t("boot_close_hint"),
             font=(FONT_FAMILY, FONT_BOOT_DETAIL - 1),
             wraplength=OVERLAY_WRAP,
             justify="left",
@@ -668,6 +593,55 @@ class KioskApp(tk.Tk):
             return
         self._update_connection_copy(summary.get("pending", self.scan_queue.pending_count()))
 
+    def t(self, key: str, **kwargs) -> str:
+        return self.translator.t(key, **kwargs)
+
+    @staticmethod
+    def _get_local_ip() -> str:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(1)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except OSError:
+            return ""
+
+    def _destroy_settings_page(self):
+        self._settings_canvas = None
+        if self.settings_frame is not None:
+            try:
+                self.settings_frame.destroy()
+            except tk.TclError:
+                pass
+            self.settings_frame = None
+
+    def _bind_settings_scroll(self, canvas: tk.Canvas, *widgets):
+        """Bind wheel / Linux scroll buttons to the settings canvas and its content."""
+
+        def scroll_units(direction: int):
+            canvas.yview_scroll(direction, "units")
+
+        def on_wheel(event):
+            if event.delta:
+                scroll_units(int(-1 * (event.delta / 120)))
+            return "break"
+
+        def on_linux_scroll(event):
+            scroll_units(-1 if event.num == 4 else 1)
+            return "break"
+
+        for widget in (canvas, *widgets):
+            widget.bind("<MouseWheel>", on_wheel)
+            widget.bind("<Button-4>", on_linux_scroll)
+            widget.bind("<Button-5>", on_linux_scroll)
+
+    def _settings_scroll_page(self, direction: int):
+        canvas = getattr(self, "_settings_canvas", None)
+        if canvas is not None and canvas.winfo_exists():
+            canvas.yview_scroll(direction, "units")
+
     def create_styles(self):
         """Configure ttk styles for large-footprint kiosk buttons."""
         self.style = ttk.Style(self)
@@ -703,6 +677,58 @@ class KioskApp(tk.Tk):
             background=[("active", self.COLORS["card"]), ("pressed", self.COLORS["accent"])],
             foreground=[("active", "#ffffff")],
         )
+        self._configure_settings_widget_styles()
+
+    def _configure_settings_widget_styles(self):
+        """Dark-theme ttk styles for the settings scroll bar and comboboxes."""
+        c = self.COLORS
+        self.style.configure(
+            "Settings.TCombobox",
+            font=(FONT_FAMILY, 11),
+            padding=(12, 8),
+            fieldbackground=c["card"],
+            background=c["card_border"],
+            foreground=c["text"],
+            arrowcolor=c["subtext"],
+            bordercolor=c["card_border"],
+            lightcolor=c["card_border"],
+            darkcolor=c["card_border"],
+        )
+        self.style.map(
+            "Settings.TCombobox",
+            fieldbackground=[("readonly", c["card"]), ("disabled", c["sidebar"])],
+            foreground=[("readonly", c["text"])],
+            arrowcolor=[("active", c["accent"]), ("readonly", c["subtext"])],
+        )
+        self.style.configure(
+            "Settings.Vertical.TScrollbar",
+            background=c["card_border"],
+            troughcolor=c["bg"],
+            bordercolor=c["bg"],
+            arrowcolor=c["subtext"],
+            darkcolor=c["bg"],
+            lightcolor=c["bg"],
+            gripcount=0,
+            width=14,
+        )
+        self.style.map(
+            "Settings.Vertical.TScrollbar",
+            background=[("active", c["accent"]), ("pressed", c["button"])],
+            arrowcolor=[("active", c["text"]), ("disabled", c["muted"])],
+        )
+        self.option_add("*TCombobox*Listbox.background", c["card"])
+        self.option_add("*TCombobox*Listbox.foreground", c["text"])
+        self.option_add("*TCombobox*Listbox.selectBackground", c["sidebar_active"])
+        self.option_add("*TCombobox*Listbox.selectForeground", c["text"])
+        self.option_add("*TCombobox*Listbox.font", (FONT_FAMILY, 11))
+
+    @staticmethod
+    def _lang_from_combo_label(label: str) -> str:
+        return "DE" if label == SETTINGS_LANG_DE else "EN"
+
+    @staticmethod
+    def _combo_label_for_lang(lang: str) -> str:
+        return SETTINGS_LANG_DE if lang == "DE" else SETTINGS_LANG_EN
 
     def build_ui_frames(self):
         """Create header/body/footer structure, clock labels, overlay region, and footer buttons."""
@@ -723,13 +749,13 @@ class KioskApp(tk.Tk):
         # Thin divider
         tk.Frame(self.sidebar, bg="#23252b", height=1).pack(fill="x")
 
-        self._add_nav_item("home", "home", "Home", self.revert_to_rest, active=True, pady=(10, 0))
-        self._add_nav_item("user", "user", "User", self._open_user_panel, pady=(10, 0))
-        self._add_nav_item("admin", "admin", "Admin", lambda: self.action_button_clicked("ADMIN"), pady=(10, 0))
-        
+        self._add_nav_item("home", "home", self.t("nav_home"), self.revert_to_rest, active=True, pady=(10, 0))
+        self._add_nav_item("user", "user", self.t("nav_user"), self._open_user_panel, pady=(10, 0))
+        self._add_nav_item("admin", "admin", self.t("nav_admin"), lambda: self.action_button_clicked("ADMIN"), pady=(10, 0))
+
         tk.Frame(self.sidebar, bg=self.COLORS["sidebar"]).pack(expand=True, fill="both")
-        
-        self._add_nav_item("settings", "settings", "Settings", self._open_settings_info, pady=(0, 20))
+
+        self._add_nav_item("settings", "settings", self.t("nav_settings"), self._open_settings_info, pady=(0, 20))
 
         self.main_area = tk.Frame(self, bg=self.COLORS["bg"])
         self.main_area.pack(side="right", fill="both", expand=True)
@@ -758,7 +784,7 @@ class KioskApp(tk.Tk):
         self.status_dot.pack(side="left", anchor="center")
         self.status_beacon = tk.Label(
             self.status_row,
-            text="Online",
+            text=self.t("status_online"),
             font=(FONT_FAMILY, FONT_HEADER_STATUS, "bold"),
             bg=hdr_bg,
             fg=self.COLORS["success"],
@@ -807,7 +833,7 @@ class KioskApp(tk.Tk):
         self.btn_status_wrap.pack()
         self.btn_status = RoundedButton(
             self.btn_status_wrap,
-            "Status",
+            self.t("btn_status"),
             self._check_status_clicked,
             width=STATUS_BUTTON_W,
             height=STATUS_BUTTON_H,
@@ -829,7 +855,7 @@ class KioskApp(tk.Tk):
         tk.Frame(hint_strip, bg="#23252b", width=48, height=1).pack(side="left", padx=(0, 12), pady=8)
         self.lbl_instruction = tk.Label(
             hint_strip,
-            text="TAP BADGE TO CLOCK IN / OUT",
+            text=self.t("clock_instr"),
             font=(FONT_FAMILY, FONT_INSTRUCTION),
             bg=self.COLORS["bg"],
             fg=self.COLORS["subtext"],
@@ -937,8 +963,8 @@ class KioskApp(tk.Tk):
         """Open status badge prompt only when a server connection is available."""
         if not self.api_session.is_approved and not self.api_session.authenticate(silent=True):
             self._show_info_screen(
-                "Status unavailable",
-                "No internet connection right now.\n\nPlease come back later to check your current status.",
+                self.t("status_unavailable_title"),
+                self.t("status_unavailable_body"),
                 self.COLORS["warning"],
             )
             return
@@ -987,32 +1013,31 @@ class KioskApp(tk.Tk):
 
     def _update_connection_copy(self, pending_count: int):
         """Show online/offline and queue state in worker-friendly language."""
-        t = self.TRANSLATIONS[self.current_lang]
         if self.api_session.is_approved:
             if pending_count:
                 self._set_status_indicator(
                     self.COLORS["warning"],
                     self.COLORS["warning"],
-                    f"Online - syncing {pending_count}",
+                    self.t("status_syncing", count=pending_count),
                 )
-                self.lbl_instruction.config(text=t["clock_instr_syncing"].format(pending_count))
+                self.lbl_instruction.config(text=self.t("clock_instr_syncing", count=pending_count))
             else:
                 self._set_status_indicator(
                     self.COLORS["success"],
                     self.COLORS["success"],
-                    "Online",
+                    self.t("status_online"),
                 )
-                self.lbl_instruction.config(text=t["clock_instr"])
+                self.lbl_instruction.config(text=self.t("clock_instr"))
         else:
             self._set_status_indicator(
                 self.COLORS["error"],
                 self.COLORS["error"],
-                "Offline mode",
+                self.t("status_offline"),
             )
             if pending_count:
-                self.lbl_instruction.config(text=t["clock_instr_offline_saved"].format(pending_count))
+                self.lbl_instruction.config(text=self.t("clock_instr_offline_saved", count=pending_count))
             else:
-                self.lbl_instruction.config(text=t["clock_instr_offline"])
+                self.lbl_instruction.config(text=self.t("clock_instr_offline"))
 
     def _rfid_listen_loop(self):
         """Background loop: wait for tags, push UIDs to :meth:`_on_card_uid` on the UI thread."""
@@ -1057,10 +1082,10 @@ class KioskApp(tk.Tk):
             self.timeout_timer = None
 
         if pending_context:
-            detail = "Checking your badge…"
+            detail = self.t("overlay_checking_badge")
         else:
-            detail = "Saving your time stamp…"
-        self.lbl_overlay_title.config(text="One moment…", fg=self.COLORS["accent"])
+            detail = self.t("overlay_saving_stamp")
+        self.lbl_overlay_title.config(text=self.t("overlay_one_moment"), fg=self.COLORS["accent"])
         self.lbl_overlay_details.config(
             text=detail,
             fg=self.COLORS["subtext"],
@@ -1156,60 +1181,60 @@ class KioskApp(tk.Tk):
                 self._open_admin_page(uid)
             return
         if (result or {}).get("admin_denied"):
-            title = "Admin access denied"
+            title = self.t("admin_denied_title")
             color = self.COLORS["error"]
-            details = "This badge is not allowed to open the admin page."
+            details = self.t("admin_denied_body")
         elif (result or {}).get("query_failed"):
             title = {
-                "CHECK_STATUS": "Status unavailable",
-                "FLEXTIME": "Flextime unavailable",
-                "HOLIDAY": "Holidays unavailable",
-            }.get((result or {}).get("query_kind"), "Information unavailable")
+                "CHECK_STATUS": self.t("query_unavailable_status"),
+                "FLEXTIME": self.t("query_unavailable_flextime"),
+                "HOLIDAY": self.t("query_unavailable_holiday"),
+            }.get((result or {}).get("query_kind"), self.t("query_unavailable_default"))
             if (result or {}).get("http_status") == 404:
-                title = "Badge not registered"
+                title = self.t("badge_not_registered")
                 color = self.COLORS["error"]
-                details = terminal_msg or "This badge is not assigned to a user."
+                details = terminal_msg or self.t("badge_not_assigned")
             else:
                 color = self.COLORS["warning"]
-                details = terminal_msg or "The server did not answer. Please try again when the terminal is online."
+                details = terminal_msg or self.t("server_no_answer")
             detail_font = (FONT_FAMILY, FONT_OVERLAY_BODY + 2, "bold")
         elif ok and (result or {}).get("offline_saved"):
             pending = int((result or {}).get("queue_pending", self.scan_queue.pending_count()))
-            title = "Saved offline"
+            title = self.t("saved_offline_title")
             color = self.COLORS["warning"]
-            details = (
-                "Your badge scan was saved on this terminal.\n\n"
-                "It will sync automatically when the connection returns."
-            )
+            details = self.t("saved_offline_body")
             if pending:
-                details = f"{details}\n\n{pending} saved stamp(s) are waiting."
+                details = f"{details}\n\n{self.t('saved_offline_pending', count=pending)}"
             detail_font = (FONT_FAMILY, FONT_OVERLAY_BODY + 2, "bold")
         elif ok and pending_context:
             title = {
-                "CHECK_STATUS": "Your status",
-                "FLEXTIME": "Flextime",
-                "HOLIDAY": "Holidays & time off",
-            }.get(pending_context, "Information")
+                "CHECK_STATUS": self.t("query_title_status"),
+                "FLEXTIME": self.t("query_title_flextime"),
+                "HOLIDAY": self.t("query_title_holiday"),
+            }.get(pending_context, self.t("query_title_default"))
             color = self.COLORS["accent"]
             state_raw = ((result or {}).get("state") or "").lower()
             state_label = {
-                "in": "Clocked in",
-                "out": "Clocked out",
-            }.get(state_raw, "No status yet")
+                "in": self.t("state_in"),
+                "out": self.t("state_out"),
+            }.get(state_raw, self.t("state_none"))
             since = (result or {}).get("since") or ""
             worked = (result or {}).get("worked_today_hm") or "0:00"
-            status_lines = [f"Status: {state_label}", f"Worked today: {worked}"]
+            status_lines = [
+                self.t("status_line_status", state=state_label),
+                self.t("status_line_worked", worked=worked),
+            ]
             if since:
-                status_lines.append(f"Since: {since}")
+                status_lines.append(self.t("status_line_since", since=since))
             status_block = "\n".join(status_lines)
 
             if pending_context == "CHECK_STATUS":
                 details = status_block
             elif pending_context == "FLEXTIME":
-                extra = terminal_msg or "No flextime balance was returned yet."
+                extra = terminal_msg or self.t("flextime_no_balance")
                 details = f"{status_block}\n\n{extra}"
             elif pending_context == "HOLIDAY":
-                extra = terminal_msg or "No holiday balance was returned yet."
+                extra = terminal_msg or self.t("holiday_no_balance")
                 details = f"{status_block}\n\n{extra}"
             else:
                 details = terminal_msg or status_block
@@ -1217,14 +1242,14 @@ class KioskApp(tk.Tk):
         elif ok:
             # Successful stamp: simplified and large
             if ev == "in":
-                title = "Checked In"
-                details = "Welcome!"
+                title = self.t("checked_in_title")
+                details = self.t("checked_in_body")
             elif ev == "out":
-                title = "Checked Out"
-                details = "See you soon!"
+                title = self.t("checked_out_title")
+                details = self.t("checked_out_body")
             else:
-                title = "Success"
-                details = "Time recorded."
+                title = self.t("stamp_success_title")
+                details = self.t("stamp_success_body")
                 
             color = self.COLORS["success"] if ev == "in" else (self.COLORS["error"] if ev == "out" else self.COLORS["success"])
             detail_font = (FONT_FAMILY, 32, "bold")
@@ -1235,15 +1260,11 @@ class KioskApp(tk.Tk):
             self.timeout_timer = self.after(5000, self.revert_to_rest)
         else:
             if (result or {}).get("http_status") == 404:
-                title = "Badge not registered"
-                details = terminal_msg or "This badge is not assigned to a user."
+                title = self.t("badge_not_registered")
+                details = terminal_msg or self.t("badge_not_assigned")
             else:
-                title = "Couldn’t complete that"
-                details = (
-                    terminal_msg
-                    or "We couldn’t confirm this with the server.\n\n"
-                    "Please try again in a moment. If it keeps happening, ask an admin to check the terminal."
-                )
+                title = self.t("action_failed_title")
+                details = terminal_msg or self.t("action_failed_body")
             color = self.COLORS["error"]
             detail_font = (FONT_FAMILY, FONT_OVERLAY_BODY + 1, "bold")
 
@@ -1293,7 +1314,7 @@ class KioskApp(tk.Tk):
 
         tk.Label(
             user_panel,
-            text="What would you like to check?",
+            text=self.t("user_title"),
             font=(FONT_FAMILY, FONT_OVERLAY_TITLE),
             bg=self.COLORS["surface"],
             fg=self.COLORS["text"],
@@ -1301,9 +1322,9 @@ class KioskApp(tk.Tk):
         tk.Label(
             user_panel,
             text=(
-                "Choose an option, then scan your badge."
+                self.t("user_subtitle_online")
                 if self.api_session.is_approved
-                else "No internet connection right now. Please come back later."
+                else self.t("user_subtitle_offline")
             ),
             font=(FONT_FAMILY, FONT_OVERLAY_BODY),
             bg=self.COLORS["surface"],
@@ -1315,7 +1336,7 @@ class KioskApp(tk.Tk):
             choices.pack(fill="x", padx=36)
             RoundedButton(
                 choices,
-                "Flextime",
+                self.t("btn_flextime"),
                 lambda: self.action_button_clicked("FLEXTIME"),
                 width=260,
                 height=70,
@@ -1327,7 +1348,7 @@ class KioskApp(tk.Tk):
             ).pack(side="left", expand=True, padx=(0, 8))
             RoundedButton(
                 choices,
-                "Holidays",
+                self.t("btn_holidays"),
                 lambda: self.action_button_clicked("HOLIDAY"),
                 width=260,
                 height=70,
@@ -1378,14 +1399,14 @@ class KioskApp(tk.Tk):
         header = header_panel.inner
         tk.Label(
             header,
-            text="Admin overview",
+            text=self.t("admin_title"),
             font=(FONT_FAMILY, FONT_HEADER_TITLE + 2),
             bg=self.COLORS["surface"],
             fg=self.COLORS["text"],
         ).pack(side="left", padx=10, pady=6)
         tk.Label(
             header,
-            text="Unlocked",
+            text=self.t("admin_unlocked"),
             font=(FONT_FAMILY, FONT_HEADER_STATUS),
             bg=self.COLORS["surface"],
             fg=self.COLORS["success"],
@@ -1405,7 +1426,7 @@ class KioskApp(tk.Tk):
 
         tk.Label(
             self.admin_frame,
-            text="Stamps that need attention",
+            text=self.t("admin_stamps_title"),
             font=(FONT_FAMILY, FONT_OVERLAY_BODY, "bold"),
             anchor="w",
             bg=self.COLORS["bg"],
@@ -1426,7 +1447,7 @@ class KioskApp(tk.Tk):
         
         RoundedButton(
             controls,
-            "Sync All",
+            self.t("admin_sync_btn"),
             self._admin_retry_sync,
             width=170,
             height=48,
@@ -1439,7 +1460,7 @@ class KioskApp(tk.Tk):
 
         RoundedButton(
             controls,
-            "Refresh",
+            self.t("admin_refresh_btn"),
             self._refresh_admin_page,
             width=170,
             height=48,
@@ -1452,7 +1473,7 @@ class KioskApp(tk.Tk):
 
         RoundedButton(
             controls,
-            "Clear Local",
+            self.t("admin_clear_btn"),
             self._admin_clear_local_stamps,
             width=170,
             height=48,
@@ -1468,157 +1489,194 @@ class KioskApp(tk.Tk):
 
     def _open_settings_page(self):
         """Admin-only settings panel UI."""
-        t = self.TRANSLATIONS[self.current_lang]
         if self.timeout_timer:
             self.after_cancel(self.timeout_timer)
         self.current_state = "SETTINGS"
         self._set_nav_active("settings")
 
-        if self.admin_frame: self.admin_frame.destroy()
-        if self.user_panel_frame: self.user_panel_frame.destroy()
+        if self.admin_frame:
+            self.admin_frame.destroy()
+            self.admin_frame = None
+        if self.user_panel_frame:
+            self.user_panel_frame.destroy()
+            self.user_panel_frame = None
         self.overlay_frame.pack_forget()
         self.rest_frame.pack_forget()
 
-        self.settings_frame = tk.Frame(self.body, bg=self.COLORS["bg"])
+        self._settings_draft_lang = self.current_lang
+        self._settings_draft_sync_ms = self.sync_interval_ms
+        self._settings_suppress_events = True
+
+        self._destroy_settings_page()
+
+        c = self.COLORS
+        panel_bg = c["bg"]
+        card_bg = c["card"]
+        row_alt = c["bg"]
+        border = c["card_border"]
+
+        self.settings_frame = tk.Frame(self.body, bg=panel_bg)
         self.settings_frame.pack(expand=True, fill="both", padx=30, pady=20)
+        self.settings_frame.grid_rowconfigure(1, weight=1)
+        self.settings_frame.grid_columnconfigure(0, weight=1)
 
         tk.Label(
             self.settings_frame,
-            text=t["settings_title"],
+            text=self.t("settings_title"),
             font=(FONT_FAMILY, 18, "bold"),
-            bg=self.COLORS["bg"],
-            fg=self.COLORS["text"]
-        ).pack(anchor="w", pady=(0, 20))
+            bg=panel_bg,
+            fg=c["text"],
+        ).grid(row=0, column=0, sticky="w", pady=(0, 8))
 
-        container = ScrollableRoundedPanel(
-            self.settings_frame,
-            bg="#131b2e",
-            border=self.COLORS["card_border"],
-            radius=16
-        )
-        container.pack(fill="both", expand=True)
-        inner = container.inner
+        scroll_outer = tk.Frame(self.settings_frame, bg=panel_bg)
+        scroll_outer.grid(row=1, column=0, sticky="nsew")
+        scroll_outer.grid_rowconfigure(0, weight=1)
+        scroll_outer.grid_columnconfigure(0, weight=1)
 
-        def add_setting(label_text, widget_class, **kwargs):
-            row = tk.Frame(inner, bg="#131b2e", height=60)
-            row.pack(fill="x", pady=10, padx=20)
+        scroll_border = tk.Frame(scroll_outer, bg=border, padx=1, pady=1)
+        scroll_border.grid(row=0, column=0, sticky="nsew")
+        scroll_border.grid_rowconfigure(0, weight=1)
+        scroll_border.grid_columnconfigure(0, weight=1)
+
+        scroll_wrap = tk.Frame(scroll_border, bg=card_bg)
+        scroll_wrap.grid(row=0, column=0, sticky="nsew")
+        scroll_wrap.grid_rowconfigure(0, weight=1)
+        scroll_wrap.grid_columnconfigure(0, weight=1)
+
+        canvas = tk.Canvas(scroll_wrap, bg=card_bg, highlightthickness=0, bd=0)
+        scrollbar = ttk.Scrollbar(scroll_wrap, orient="vertical", command=canvas.yview, style="Settings.Vertical.TScrollbar")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns", padx=(0, 2))
+        self._settings_canvas = canvas
+
+        inner = tk.Frame(canvas, bg=card_bg)
+        inner_id = canvas.create_window((0, 0), window=inner, anchor="nw")
+
+        def _on_inner_configure(_event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def _on_canvas_configure(event):
+            canvas.itemconfigure(inner_id, width=event.width)
+
+        inner.bind("<Configure>", _on_inner_configure)
+        canvas.bind("<Configure>", _on_canvas_configure)
+        self._bind_settings_scroll(canvas, inner, scroll_wrap, scroll_border)
+
+        scroll_btns = tk.Frame(scroll_outer, bg=panel_bg)
+        scroll_btns.grid(row=0, column=1, sticky="ns", padx=(8, 0))
+        for label, direction in (("\u25b2", -3), ("\u25bc", 3)):
+            btn = tk.Button(
+                scroll_btns,
+                text=label,
+                font=(FONT_FAMILY, 13, "bold"),
+                width=3,
+                height=1,
+                bg=card_bg,
+                fg=c["subtext"],
+                activebackground=c["sidebar_active"],
+                activeforeground=c["text"],
+                relief="flat",
+                highlightthickness=1,
+                highlightbackground=border,
+                highlightcolor=c["accent"],
+                bd=0,
+                cursor="hand2",
+                command=lambda d=direction: self._settings_scroll_page(d),
+            )
+            btn.pack(pady=4, ipady=4)
+
+        def add_setting(label_text, **combo_kwargs):
+            row = tk.Frame(
+                inner,
+                bg=card_bg,
+                height=56,
+                highlightthickness=1,
+                highlightbackground=border,
+                highlightcolor=border,
+            )
+            row.pack(fill="x", pady=8, padx=16)
             row.pack_propagate(False)
-            tk.Label(row, text=label_text, font=(FONT_FAMILY, 12, "bold"), bg="#131b2e", fg="#f8fafc").pack(side="left")
-            w = widget_class(row, **kwargs)
-            w.pack(side="right", padx=5)
+            tk.Label(
+                row,
+                text=label_text,
+                font=(FONT_FAMILY, 12, "bold"),
+                bg=card_bg,
+                fg=c["text"],
+            ).pack(side="left", padx=(4, 8))
+            combo_kwargs.setdefault("style", "Settings.TCombobox")
+            w = ttk.Combobox(row, **combo_kwargs)
+            w.pack(side="right", padx=4, ipady=2)
             return w
 
-        # 1. Language
-        lang_cb = add_setting(t["settings_lang"], ttk.Combobox,
-                              values=["🇺🇸 English", "🇩🇪 Deutsch"],
-                              state="readonly", width=15)
-        lang_cb.set("🇺🇸 English" if self.current_lang == "EN" else "🇩🇪 Deutsch")
-        lang_cb.bind("<<ComboboxSelected>>", lambda e: self._update_lang(lang_cb.get()))
+        def add_section_title(title: str):
+            sec = tk.Frame(inner, bg=card_bg, height=28)
+            sec.pack(fill="x", padx=16, pady=(12, 4))
+            sec.pack_propagate(False)
+            tk.Label(sec, text=title, font=(FONT_FAMILY, 12, "bold"), bg=card_bg, fg=c["subtext"]).pack(side="left")
 
-        # 2. Terminal Name
-        name_row = tk.Frame(inner, bg="#131b2e", height=60)
-        name_row.pack(fill="x", pady=10, padx=20)
-        name_row.pack_propagate(False)
-        tk.Label(name_row, text=t["settings_terminal_name"],
-                 font=(FONT_FAMILY, 12, "bold"), bg="#131b2e", fg="#f8fafc").pack(side="left")
-        name_var = tk.StringVar(value=self.terminal_name)
-        name_entry = tk.Entry(name_row, textvariable=name_var, font=(FONT_FAMILY, 11),
-                              bg="#0f1929", fg="#f8fafc", insertbackground="#f8fafc",
-                              relief="flat", width=18, bd=4)
-        name_entry.pack(side="right", padx=5)
-        name_entry.bind("<FocusOut>", lambda e: setattr(self, "terminal_name", name_var.get().strip()))
-        name_entry.bind("<Return>",   lambda e: setattr(self, "terminal_name", name_var.get().strip()))
-
-        # 3. Scan Cooldown
-        _cooldown_map = {"1s": 1.0, "2s": 2.0, "3s": 3.0, "5s": 5.0}
-        _cooldown_rev = {v: k for k, v in _cooldown_map.items()}
-        cool_cb = add_setting(t["settings_scan_cooldown"], ttk.Combobox,
-                              values=list(_cooldown_map.keys()), state="readonly", width=8)
-        cool_cb.set(_cooldown_rev.get(self.scan_cooldown_s, "2s"))
-        cool_cb.bind("<<ComboboxSelected>>",
-                     lambda e: setattr(self, "scan_cooldown_s", _cooldown_map[cool_cb.get()]))
-
-        # 4. Sound on Scan (toggle button)
-        sound_row = tk.Frame(inner, bg="#131b2e", height=60)
-        sound_row.pack(fill="x", pady=10, padx=20)
-        sound_row.pack_propagate(False)
-        tk.Label(sound_row, text=t["settings_sound"],
-                 font=(FONT_FAMILY, 12, "bold"), bg="#131b2e", fg="#f8fafc").pack(side="left")
-        sound_state = tk.BooleanVar(value=self.sound_enabled)
-        def _toggle_sound():
-            sound_state.set(not sound_state.get())
-            self.sound_enabled = sound_state.get()
-            _sound_btn_lbl.config(text=t["sound_on"] if self.sound_enabled else t["sound_off"],
-                                  fg=self.COLORS["success"] if self.sound_enabled else self.COLORS["subtext"])
-        _sound_btn_lbl = tk.Label(sound_row,
-                                  text=t["sound_on"] if self.sound_enabled else t["sound_off"],
-                                  font=(FONT_FAMILY, 11, "bold"),
-                                  bg="#1e293b", fg=self.COLORS["success"] if self.sound_enabled else self.COLORS["subtext"],
-                                  padx=18, pady=6, cursor="hand2")
-        _sound_btn_lbl.pack(side="right", padx=5)
-        _sound_btn_lbl.bind("<Button-1>", lambda e: _toggle_sound())
-
-        # 5. Sync Interval
-        _sync_map = {"30s": 30000, "1 min": 60000, "5 min": 300000}
-        _sync_rev  = {v: k for k, v in _sync_map.items()}
-        sync_cb = add_setting(t["settings_sync"], ttk.Combobox,
-                              values=list(_sync_map.keys()), state="readonly", width=8)
-        sync_cb.set(_sync_rev.get(self.sync_interval_ms, "1 min"))
-        sync_cb.bind("<<ComboboxSelected>>",
-                     lambda e: setattr(self, "sync_interval_ms", _sync_map[sync_cb.get()]))
-
-        net_section_label = tk.Frame(inner, bg="#131b2e", height=30)
-        net_section_label.pack(fill="x", padx=20, pady=(14, 2))
-        net_section_label.pack_propagate(False)
-        tk.Label(net_section_label, text=t["settings_network"],
-                 font=(FONT_FAMILY, 12, "bold"), bg="#131b2e", fg="#f8fafc").pack(side="left")
-
-        net_info = self._get_network_info()
-        for label, value, color in net_info:
-            row = tk.Frame(inner, bg="#0f1929", height=44)
-            row.pack(fill="x", pady=2, padx=20)
+        def add_detail_row(label_text, value_text, value_color):
+            row = tk.Frame(inner, bg=row_alt, height=42, highlightthickness=1, highlightbackground=border)
+            row.pack(fill="x", pady=3, padx=16)
             row.pack_propagate(False)
-            tk.Label(row, text=label, font=(FONT_FAMILY, 10), bg="#0f1929",
-                     fg=self.COLORS["subtext"]).pack(side="left", padx=10)
-            tk.Label(row, text=value, font=(FONT_FAMILY, 10, "bold"), bg="#0f1929",
-                     fg=color).pack(side="right", padx=10)
+            tk.Label(row, text=label_text, font=(FONT_FAMILY, 10), bg=row_alt, fg=c["subtext"]).pack(side="left", padx=10)
+            tk.Label(row, text=value_text, font=(FONT_FAMILY, 10, "bold"), bg=row_alt, fg=value_color).pack(side="right", padx=10)
 
-        # 7. Terminal Info (read-only)
-        info_section = tk.Frame(inner, bg="#131b2e", height=30)
-        info_section.pack(fill="x", padx=20, pady=(14, 2))
-        info_section.pack_propagate(False)
-        tk.Label(info_section, text=t["settings_info"],
-                 font=(FONT_FAMILY, 12, "bold"), bg="#131b2e", fg="#f8fafc").pack(side="left")
+        self._settings_sync_map = {"30s": 30000, "1 min": 60000, "5 min": 300000}
+        sync_rev = {v: k for k, v in self._settings_sync_map.items()}
+
+        self._settings_lang_cb = add_setting(
+            self.t("settings_lang"),
+            values=[SETTINGS_LANG_EN, SETTINGS_LANG_DE],
+            state="readonly",
+            width=14,
+        )
+        self._settings_lang_cb.set(self._combo_label_for_lang(self._settings_draft_lang))
+        self._settings_lang_cb.bind("<<ComboboxSelected>>", self._on_settings_lang_changed)
+
+        self._settings_sync_cb = add_setting(
+            self.t("settings_sync"),
+            values=list(self._settings_sync_map.keys()),
+            state="readonly",
+            width=10,
+        )
+        self._settings_sync_cb.set(sync_rev.get(self._settings_draft_sync_ms, "1 min"))
+        self._settings_sync_cb.bind("<<ComboboxSelected>>", self._on_settings_sync_changed)
+
+        add_section_title(self.t("settings_network"))
+        for label_key, value, value_color in self._get_network_info():
+            add_detail_row(self.t(label_key), value, value_color)
+
+        add_section_title(self.t("settings_info"))
         counts = self.scan_queue.status_counts()
-        for lbl_txt, val_txt, col in [
-            ("Version",      "1.0.0",                        self.COLORS["subtext"]),
-            ("Total sent",   str(counts.get("synced",  0)),  self.COLORS["success"]),
-            ("Pending sync", str(counts.get("pending", 0)),  self.COLORS["warning"]),
-            ("Failed",       str(counts.get("failed",  0)),  self.COLORS["error"]),
+        for lbl_key, val_txt, col in [
+            ("info_version", "1.0.0", c["subtext"]),
+            ("info_total_sent", str(counts.get("synced", 0)), c["success"]),
+            ("info_pending_sync", str(counts.get("pending", 0)), c["warning"]),
+            ("info_failed", str(counts.get("failed", 0)), c["error"]),
         ]:
-            ir = tk.Frame(inner, bg="#0f1929", height=44)
-            ir.pack(fill="x", pady=2, padx=20)
-            ir.pack_propagate(False)
-            tk.Label(ir, text=lbl_txt, font=(FONT_FAMILY, 10), bg="#0f1929",
-                     fg=self.COLORS["subtext"]).pack(side="left", padx=10)
-            tk.Label(ir, text=val_txt, font=(FONT_FAMILY, 10, "bold"), bg="#0f1929",
-                     fg=col).pack(side="right", padx=10)
+            add_detail_row(self.t(lbl_key), val_txt, col)
 
-        # 8. Save Button
-        save_btn_row = tk.Frame(inner, bg="#131b2e", height=80)
-        save_btn_row.pack(fill="x", pady=20, padx=20)
+        tk.Frame(inner, bg=card_bg, height=8).pack(fill="x")
+
+        self._settings_suppress_events = False
+        inner.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+        save_footer = tk.Frame(self.settings_frame, bg=panel_bg)
+        save_footer.grid(row=2, column=0, sticky="ew", pady=(10, 0))
         RoundedButton(
-            save_btn_row,
-            t["settings_save"],
-            self._save_settings_to_disk,
+            save_footer,
+            self.t("settings_save"),
+            self._commit_settings,
             width=280,
             height=50,
             bg=self.COLORS["success"],
             fg="#ffffff",
             active_bg="#059669",
             border=self.COLORS["success"],
-            font=(FONT_FAMILY, 10, "bold")
-        ).pack(expand=True)
+            font=(FONT_FAMILY, 10, "bold"),
+        ).pack()
 
     def _load_settings(self):
         try:
@@ -1626,105 +1684,122 @@ class KioskApp(tk.Tk):
                 with open(self.settings_path, "r") as f:
                     return json.load(f)
         except: pass
-        return {"lang": "EN", "terminal_name": "", "scan_cooldown": 2.0,
-                "sound": False, "sync_interval_ms": 60000, "timeout_ms": 60000}
+        return {"lang": "EN", "sync_interval_ms": 60000, "timeout_ms": 60000}
 
-    def _save_settings_to_disk(self):
+    def _read_settings_draft_from_widgets(self):
+        """Read unsaved combobox values into draft fields (does not apply to the running app)."""
+        if hasattr(self, "_settings_lang_cb") and self._settings_lang_cb.winfo_exists():
+            val = self._settings_lang_cb.get()
+            self._settings_draft_lang = self._lang_from_combo_label(val)
+        if hasattr(self, "_settings_sync_cb") and self._settings_sync_cb.winfo_exists():
+            key = self._settings_sync_cb.get()
+            self._settings_draft_sync_ms = self._settings_sync_map.get(key, self._settings_draft_sync_ms)
+
+    def _on_settings_lang_changed(self, _event=None):
+        """Remember language choice locally; home screen stays unchanged until Save."""
+        if getattr(self, "_settings_suppress_events", False):
+            return
+        self._read_settings_draft_from_widgets()
+
+    def _on_settings_sync_changed(self, _event=None):
+        """Remember sync interval locally; heartbeat interval unchanged until Save."""
+        if getattr(self, "_settings_suppress_events", False):
+            return
+        self._read_settings_draft_from_widgets()
+
+    def _commit_settings(self):
+        """Apply draft settings to the running app and persist to disk."""
+        self._read_settings_draft_from_widgets()
+        self.current_lang = self._settings_draft_lang
+        self.sync_interval_ms = self._settings_draft_sync_ms
+        self.translator.set_lang(self.current_lang)
+        self.title(self.t("window_title"))
         self.settings = {
-            "lang":             self.current_lang,
-            "terminal_name":    self.terminal_name,
-            "scan_cooldown":    self.scan_cooldown_s,
-            "sound":            self.sound_enabled,
+            "lang": self.current_lang,
             "sync_interval_ms": self.sync_interval_ms,
-            "timeout_ms":       self.IDLE_TIMEOUT_MS,
+            "timeout_ms": self.IDLE_TIMEOUT_MS,
         }
         try:
             with open(self.settings_path, "w") as f:
                 json.dump(self.settings, f, indent=2)
-            t = self.TRANSLATIONS[self.current_lang]
-            self._show_info_screen("\u2713", t["save_success"], self.COLORS["success"])
+            self._apply_translations()
+            self._show_info_screen("\u2713", self.t("save_success"), self.COLORS["success"])
         except Exception as e:
-            self._show_info_screen("ERROR", f"Failed to save: {e}", self.COLORS["error"])
+            self._show_info_screen(
+                self.t("save_error_title"),
+                self.t("save_error_body", error=e),
+                self.COLORS["error"],
+            )
 
-    def _update_lang(self, val):
-        self.current_lang = "DE" if "Deutsch" in val else "EN"
-        self._apply_translations()
+    def _save_settings_to_disk(self):
+        """Legacy alias — use :meth:`_commit_settings`."""
+        self._commit_settings()
 
     def _apply_translations(self):
-        t = self.TRANSLATIONS[self.current_lang]
-        self.lbl_instruction.config(text=t["clock_instr"])
-        # Update sidebar nav labels
-        if hasattr(self, 'nav_items'):
+        self.lbl_instruction.config(text=self.t("clock_instr"))
+        if hasattr(self, "nav_items"):
             for key, widgets in self.nav_items.items():
                 _, _, lbl = widgets
-                val = t.get(f"nav_{key}")
-                if val:
-                    lbl.config(text=val)
-        # Update status button text
+                lbl.config(text=self.t(f"nav_{key}"))
         if hasattr(self, "btn_status"):
-            self.btn_status.text = t["btn_status"]
+            self.btn_status.text = self.t("btn_status")
             self.btn_status._draw(self.btn_status.normal_bg)
+        if hasattr(self, "status_beacon") and hasattr(self, "scan_queue"):
+            self._update_connection_copy(self.scan_queue.pending_count())
 
     def _get_network_info(self):
-        """Return list of (label, value, color) tuples describing current network state."""
+        """Return list of (label_key, value, color) tuples for the network settings section."""
         rows = []
         ok_c = self.COLORS["success"]
         err_c = self.COLORS["error"]
         sub_c = self.COLORS["subtext"]
+        none = self.t("settings_ip_none")
 
-        # Internet connectivity + IP
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.settimeout(1)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            rows.append(("Status", "ONLINE", ok_c))
-            rows.append(("IP Address", ip, ok_c))
-        except:
-            rows.append(("Status", "OFFLINE", err_c))
-            rows.append(("IP Address", "—", sub_c))
+        local_ip = self._get_local_ip()
+        if local_ip:
+            rows.append(("settings_ip", local_ip, ok_c))
+        else:
+            rows.append(("settings_ip", none, sub_c))
 
-        # Hostname
+        if local_ip:
+            rows.append(("net_status", self.t("net_online"), ok_c))
+        else:
+            rows.append(("net_status", self.t("net_offline"), err_c))
+
         try:
-            rows.append(("Hostname", socket.gethostname(), sub_c))
-        except:
+            rows.append(("net_hostname", socket.gethostname(), sub_c))
+        except OSError:
             pass
 
-        # Default gateway (Linux only)
         try:
             gw_out = subprocess.check_output(
                 ["ip", "route", "show", "default"], timeout=2, stderr=subprocess.DEVNULL
             ).decode().strip()
-            # "default via 192.168.x.x dev wlan0"
             parts = gw_out.split()
-            gw_ip = parts[2] if len(parts) > 2 else "—"
+            gw_ip = parts[2] if len(parts) > 2 else none
             gw_iface = parts[4] if len(parts) > 4 else ""
-            rows.append(("Gateway", f"{gw_ip}  ({gw_iface})", sub_c))
-        except:
+            rows.append(("net_gateway", f"{gw_ip}  ({gw_iface})", sub_c))
+        except (OSError, subprocess.SubprocessError, IndexError):
             pass
 
-        # DNS
         try:
-            with open("/etc/resolv.conf") as f:
+            with open("/etc/resolv.conf", encoding="utf-8") as f:
                 for line in f:
                     if line.startswith("nameserver"):
-                        rows.append(("DNS Server", line.split()[1], sub_c))
+                        rows.append(("net_dns", line.split()[1], sub_c))
                         break
-        except:
+        except OSError:
             pass
 
-        # WiFi SSID
         try:
             ssid_out = subprocess.check_output(
                 ["iwgetid", "-r"], timeout=2, stderr=subprocess.DEVNULL
             ).decode().strip()
             if ssid_out:
-                rows.append(("WiFi SSID", ssid_out, sub_c))
-        except:
+                rows.append(("net_wifi_ssid", ssid_out, sub_c))
+        except (OSError, subprocess.SubprocessError):
             pass
 
-        # WiFi signal strength
         try:
             iwconfig_out = subprocess.check_output(
                 ["iwconfig"], timeout=2, stderr=subprocess.DEVNULL
@@ -1735,10 +1810,21 @@ class KioskApp(tk.Tk):
                     m = re.search(r"Signal level=(-\d+) dBm", line)
                     if m:
                         dbm = int(m.group(1))
-                        quality = "Excellent" if dbm > -50 else ("Good" if dbm > -65 else ("Fair" if dbm > -75 else "Weak"))
-                        rows.append(("Signal", f"{dbm} dBm  ({quality})", ok_c if dbm > -65 else self.COLORS["warning"]))
+                        if dbm > -50:
+                            quality = self.t("signal_excellent")
+                        elif dbm > -65:
+                            quality = self.t("signal_good")
+                        elif dbm > -75:
+                            quality = self.t("signal_fair")
+                        else:
+                            quality = self.t("signal_weak")
+                        rows.append((
+                            "net_signal",
+                            f"{dbm} dBm  ({quality})",
+                            ok_c if dbm > -65 else self.COLORS["warning"],
+                        ))
                         break
-        except:
+        except (OSError, subprocess.SubprocessError):
             pass
 
         return rows
@@ -1781,10 +1867,7 @@ class KioskApp(tk.Tk):
         failed = counts.get("failed", 0)
         synced = counts.get("synced", 0)
         self.admin_summary_label.config(
-            text=(
-                f"Waiting to send: {pending}    Needs attention: {failed}    Sent: {synced}\n"
-                "Saved stamps stay on this terminal until the server accepts them."
-            )
+            text=self.t("admin_summary", pending=pending, failed=failed, synced=synced)
         )
 
         for child in self.admin_rows_frame.winfo_children():
@@ -1794,7 +1877,7 @@ class KioskApp(tk.Tk):
         if not rows:
             tk.Label(
                 self.admin_rows_frame,
-                text="Everything looks good. No saved stamps need attention.",
+                text=self.t("admin_all_good"),
                 font=(FONT_FAMILY, FONT_OVERLAY_BODY),
                 bg=self.COLORS["card"],
                 fg=self.COLORS["success"],
@@ -1803,10 +1886,11 @@ class KioskApp(tk.Tk):
 
         for row in rows:
             status_color = self.COLORS["error"] if row["status"] == "failed" else self.COLORS["warning"]
-            label = "Needs retry" if row["status"] == "failed" else "Waiting to send"
+            label = self.t("admin_row_retry") if row["status"] == "failed" else self.t("admin_row_waiting")
+            detail = row["last_sync_error"] or self.t("admin_row_retry_auto")
             line = (
                 f"{label}  {row['client_local_time']}\n"
-                f"Attempts: {row['retry_count']}  {row['last_sync_error'] or 'Will try again automatically.'}"
+                f"{self.t('admin_row_attempts', count=row['retry_count'], detail=detail)}"
             )
             tk.Label(
                 self.admin_rows_frame,
@@ -1867,8 +1951,8 @@ class KioskApp(tk.Tk):
         """
         if action_type in ("CHECK_STATUS", "FLEXTIME", "HOLIDAY") and not self.api_session.is_approved and not self.api_session.authenticate(silent=True):
             self._show_info_screen(
-                "Not available offline",
-                "No internet connection right now.\n\nPlease come back later.",
+                self.t("offline_not_available_title"),
+                self.t("offline_not_available_body"),
                 self.COLORS["warning"],
             )
             return
@@ -1876,14 +1960,22 @@ class KioskApp(tk.Tk):
         self.active_action = action_type
         self._set_nav_active(action_type.lower() if action_type in ("ADMIN", "SETTINGS") else "home")
 
-        t = self.TRANSLATIONS[self.current_lang]
         if action_type == "ADMIN":
-            self._show_info_screen(t["auth_title"], t["auth_admin"], self.COLORS["accent"])
+            self._show_info_screen(self.t("auth_title"), self.t("auth_admin"), self.COLORS["accent"])
         elif action_type == "SETTINGS":
-            self._show_info_screen(t["auth_title"], t["auth_settings"], self.COLORS["accent"])
+            self._show_info_screen(self.t("auth_title"), self.t("auth_settings"), self.COLORS["accent"])
         else:
-            self.lbl_overlay_title.config(text={"CHECK_STATUS": "My status", "FLEXTIME": "Flextime", "HOLIDAY": "Holidays"}.get(action_type, "Next step"), fg=self.COLORS["accent"])
-            self.lbl_overlay_details.config(text="Hold your badge on the reader to continue.", fg=self.COLORS["subtext"], font=(FONT_FAMILY, FONT_OVERLAY_BODY))
+            wait_title = {
+                "CHECK_STATUS": self.t("overlay_wait_status"),
+                "FLEXTIME": self.t("overlay_wait_flextime"),
+                "HOLIDAY": self.t("overlay_wait_holiday"),
+            }.get(action_type, self.t("query_title_default"))
+            self.lbl_overlay_title.config(text=wait_title, fg=self.COLORS["accent"])
+            self.lbl_overlay_details.config(
+                text=self.t("overlay_hold_badge"),
+                fg=self.COLORS["subtext"],
+                font=(FONT_FAMILY, FONT_OVERLAY_BODY),
+            )
             self.rest_frame.pack_forget()
             self.overlay_frame.pack(expand=True, fill="both")
 
