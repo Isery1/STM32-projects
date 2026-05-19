@@ -29,9 +29,9 @@ FONT_FAMILY = "DejaVu Sans"
 DISPLAY_W, DISPLAY_H = 800, 480
 PAD_X = 12
 PAD_Y = 6
-FONT_CLOCK = 76
-FONT_DATE = 15
-FONT_INSTRUCTION = 11
+FONT_CLOCK = 68
+FONT_DATE = 13
+FONT_INSTRUCTION = 13
 FONT_HEADER_TITLE = 15
 FONT_HEADER_STATUS = 12
 FONT_OVERLAY_TITLE = 26
@@ -39,7 +39,9 @@ FONT_OVERLAY_BODY = 14
 FONT_BOOT_TITLE = 20
 FONT_BOOT_STEP = 14
 FONT_BOOT_DETAIL = 12
-FONT_BUTTON = 14
+FONT_BUTTON = 13
+STATUS_BUTTON_W = 260
+STATUS_BUTTON_H = 50
 OVERLAY_WRAP = 680
 FOOTER_PAYOUTSIDE = 0
 FOOTER_PADBOTTOM = 0
@@ -133,21 +135,17 @@ class RoundedButton(tk.Canvas):
     def _draw(self, fill: str):
         self.delete("all")
         self._rounded_rect(fill)
-        text_x = int(self["width"]) // 2
-        if self.icon_type == "info":
-            # Draw circle 'i' icon on the left
-            ix, iy = 42, int(self["height"]) // 2
-            self.create_oval(ix-12, iy-12, ix+12, iy+12, outline=self.fg, width=2)
-            self.create_text(ix, iy, text="i", fill=self.fg, font=(FONT_FAMILY, 11, "bold"))
-            text_x += 16
+        w = int(self["width"])
+        h = int(self["height"])
+        cy = h // 2
 
-        self.create_text(
-            text_x,
-            int(self["height"]) // 2,
-            text=self.text,
-            fill=self.fg,
-            font=self.font,
-        )
+        if self.icon_type == "info":
+            icon_x = 20
+            self.create_oval(icon_x - 9, cy - 9, icon_x + 9, cy + 9, outline=self.fg, width=2)
+            self.create_text(icon_x, cy, text="i", fill=self.fg, font=(FONT_FAMILY, 10, "bold"))
+            self.create_text(icon_x + 26, cy, text=self.text, fill=self.fg, font=self.font, anchor="w")
+        else:
+            self.create_text(w // 2, cy, text=self.text, fill=self.fg, font=self.font)
 
     def _press(self, _event):
         self._draw(self.active_bg)
@@ -155,6 +153,67 @@ class RoundedButton(tk.Canvas):
 
     def _release(self, _event):
         self._draw(self.normal_bg)
+
+
+def _blend_hex(fg: str, bg: str, t: float) -> str:
+    """Linear blend between two #RRGGBB colors (t=0 → fg, t=1 → bg)."""
+    fg = fg.lstrip("#")
+    bg = bg.lstrip("#")
+    fr, fg_g, fb = (int(fg[i : i + 2], 16) for i in (0, 2, 4))
+    br, bg_g, bb = (int(bg[i : i + 2], 16) for i in (0, 2, 4))
+    r = int(fr * (1 - t) + br * t)
+    g = int(fg_g * (1 - t) + bg_g * t)
+    b = int(fb * (1 - t) + bb * t)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+class PulsingDot(tk.Canvas):
+    """Animated status dot with a soft expanding ring."""
+
+    def __init__(self, parent, color: str, *, size: int = 4, pulse: int = 5, bg: str = None):
+        bg = bg or parent["bg"]
+        max_r = size + 2 + pulse
+        w = max_r * 2 + 6
+        h = max_r * 2 + 2
+        super().__init__(parent, width=w, height=h, bg=bg, highlightthickness=0, bd=0)
+        self.dot_color = color
+        self.canvas_bg = bg
+        self.core = size
+        self._pulse = pulse
+        self.cx = w // 2
+        self.cy = h // 2
+        self._phase = 0.0
+        self._tick()
+
+    def set_color(self, color: str):
+        self.dot_color = color
+
+    def _tick(self):
+        if not self.winfo_exists():
+            return
+        self.delete("all")
+        pulse = 0.5 + 0.5 * math.sin(self._phase)
+        ring_r = self.core + 2 + pulse * self._pulse
+        ring_w = max(1, int(1 + pulse * 2))
+        ring_color = _blend_hex(self.dot_color, self.canvas_bg, 0.35 + 0.45 * pulse)
+        self.create_oval(
+            self.cx - ring_r,
+            self.cy - ring_r,
+            self.cx + ring_r,
+            self.cy + ring_r,
+            outline=ring_color,
+            width=ring_w,
+        )
+        self.create_oval(
+            self.cx - self.core,
+            self.cy - self.core,
+            self.cx + self.core,
+            self.cy + self.core,
+            fill=self.dot_color,
+            outline=self.dot_color,
+        )
+        self._phase += 0.14
+        self.after(55, self._tick)
 
 
 class RoundedPanel(tk.Canvas):
@@ -278,7 +337,7 @@ class KioskApp(tk.Tk):
                 "clock_instr_syncing": "SYNCING {} SAVED STAMPS…",
                 "clock_instr_offline": "OFFLINE MODE - BADGE SCAN ACTIVE",
                 "clock_instr_offline_saved": "OFFLINE - {} STAMPS SAVED",
-                "btn_status": "Check my current status",
+                "btn_status": "Status",
                 "nav_home": "HOME",
                 "nav_user": "USER",
                 "nav_admin": "ADMIN",
@@ -315,7 +374,7 @@ class KioskApp(tk.Tk):
                 "clock_instr_syncing": "{} STEMPEL WERDEN SYNCHRONISIERT…",
                 "clock_instr_offline": "OFFLINE-MODUS - BADGE-SCAN AKTIV",
                 "clock_instr_offline_saved": "OFFLINE - {} STEMPEL GESPEICHERT",
-                "btn_status": "Status überprüfen",
+                "btn_status": "Status",
                 "nav_home": "HOME",
                 "nav_user": "BENUTZER",
                 "nav_admin": "ADMIN",
@@ -664,9 +723,9 @@ class KioskApp(tk.Tk):
         # Thin divider
         tk.Frame(self.sidebar, bg="#23252b", height=1).pack(fill="x")
 
-        self._add_nav_item("home", "home", "Home", self.revert_to_rest, active=True)
-        self._add_nav_item("user", "user", "User", self._open_user_panel)
-        self._add_nav_item("admin", "admin", "Admin", lambda: self.action_button_clicked("ADMIN"))
+        self._add_nav_item("home", "home", "Home", self.revert_to_rest, active=True, pady=(10, 0))
+        self._add_nav_item("user", "user", "User", self._open_user_panel, pady=(10, 0))
+        self._add_nav_item("admin", "admin", "Admin", lambda: self.action_button_clicked("ADMIN"), pady=(10, 0))
         
         tk.Frame(self.sidebar, bg=self.COLORS["sidebar"]).pack(expand=True, fill="both")
         
@@ -691,49 +750,42 @@ class KioskApp(tk.Tk):
             fg="#e6e6eb",
         ).pack(side="left", pady=12)
 
-        # Pill-shaped status
-        self.status_pill = tk.Frame(hdr_inner, bg=self.COLORS["status_bg"])
-        self.status_pill.pack(side="right", pady=12, ipady=3, ipadx=6)
-        self.status_dot = tk.Label(
-            self.status_pill, text="●",
-            font=(FONT_FAMILY, 8),
-            bg=self.COLORS["status_bg"],
-            fg=self.COLORS["success"],
-        )
-        self.status_dot.pack(side="left", padx=(4, 0))
+        # Online / offline label (no background box; pulsing dot only)
+        hdr_bg = self.COLORS["surface"]
+        self.status_row = tk.Frame(hdr_inner, bg=hdr_bg)
+        self.status_row.pack(side="right", pady=12)
+        self.status_dot = PulsingDot(self.status_row, self.COLORS["success"], bg=hdr_bg)
+        self.status_dot.pack(side="left", anchor="center")
         self.status_beacon = tk.Label(
-            self.status_pill,
+            self.status_row,
             text="Online",
             font=(FONT_FAMILY, FONT_HEADER_STATUS, "bold"),
-            bg=self.COLORS["status_bg"],
+            bg=hdr_bg,
             fg=self.COLORS["success"],
-            padx=4,
         )
-        self.status_beacon.pack(side="left")
+        self.status_beacon.pack(side="left", padx=(4, 0), anchor="center")
 
         self.body = tk.Frame(self.main_area, bg=self.COLORS["bg"])
-        self.body.pack(side="top", expand=True, fill="both", padx=20, pady=(12, 12))
+        self.body.pack(side="top", expand=True, fill="both", padx=16, pady=(8, 8))
 
         self.rest_frame = tk.Frame(self.body, bg=self.COLORS["bg"])
         self.rest_frame.pack(expand=True, fill="both")
 
-        # Clock panel
-        self.clock_panel = tk.Frame(
-            self.rest_frame,
-            bg=self.COLORS["card"],
-            highlightbackground=self.COLORS["card_border"],
-            highlightthickness=1,
-        )
-        self.clock_panel.pack(pady=(24, 0), ipadx=30, ipady=18)
+        self.home_center = tk.Frame(self.rest_frame, bg=self.COLORS["bg"])
+        self.home_center.pack(expand=True)
 
-        self.clock_frame = tk.Frame(self.clock_panel, bg=self.COLORS["card"])
+        # Clock (no panel background — sits directly on the home screen)
+        self.clock_panel = tk.Frame(self.home_center, bg=self.COLORS["bg"])
+        self.clock_panel.pack(pady=(8, 0))
+
+        self.clock_frame = tk.Frame(self.clock_panel, bg=self.COLORS["bg"])
         self.clock_frame.pack()
 
         self.lbl_time = tk.Label(
             self.clock_frame,
             text="12:00:00",
-            font=(FONT_FAMILY, FONT_CLOCK, "bold"),
-            bg=self.COLORS["card"],
+            font=(FONT_FAMILY, FONT_CLOCK),
+            bg=self.COLORS["bg"],
             fg=self.COLORS["text"],
         )
         self.lbl_time.pack()
@@ -742,60 +794,48 @@ class KioskApp(tk.Tk):
             self.clock_frame,
             text="SATURDAY, 16. MAY 2026",
             font=(FONT_FAMILY, FONT_DATE),
-            bg=self.COLORS["card"],
+            bg=self.COLORS["bg"],
             fg=self.COLORS["subtext"],
         )
-        self.lbl_date.pack(pady=(5, 0))
-
-        # Thin divider inside the panel
-        tk.Frame(self.clock_panel, bg="#23252b", height=1, width=240).pack(pady=(12, 4))
+        self.lbl_date.pack(pady=(4, 0))
 
         # Action row
-        self.action_row = tk.Frame(self.rest_frame, bg=self.COLORS["bg"])
-        self.action_row.pack(pady=(20, 0))
+        self.action_row = tk.Frame(self.home_center, bg=self.COLORS["bg"])
+        self.action_row.pack(pady=(14, 0))
 
-        # Centered Check Status Button
         self.btn_status_wrap = tk.Frame(self.action_row, bg=self.COLORS["bg"])
-        self.btn_status_wrap.pack(expand=True)
-        
-        RoundedButton(
+        self.btn_status_wrap.pack()
+        self.btn_status = RoundedButton(
             self.btn_status_wrap,
-            "Check my current status",
+            "Status",
             self._check_status_clicked,
-            width=270,
-            height=46,
+            width=STATUS_BUTTON_W,
+            height=STATUS_BUTTON_H,
             bg=self.COLORS["button"],
             fg="#ffffff",
             active_bg="#6d28d9",
             border=self.COLORS["button"],
             font=(FONT_FAMILY, FONT_BUTTON, "bold"),
-            icon_type="info",
-        ).pack()
+        )
+        self.btn_status.pack()
 
-        # Sleek Footer Instruction
+        # Footer instruction pinned to bottom
         self.footer_instruction = tk.Frame(self.rest_frame, bg=self.COLORS["bg"])
-        self.footer_instruction.pack(side="bottom", fill="x", pady=(0, 20))
+        self.footer_instruction.pack(side="bottom", fill="x", pady=(0, 12))
 
         # Tap-hint strip
         hint_strip = tk.Frame(self.footer_instruction, bg=self.COLORS["bg"])
         hint_strip.pack()
-        tk.Frame(hint_strip, bg="#23252b", width=60, height=1).pack(side="left", padx=(0, 12), pady=8)
-        tk.Label(
-            hint_strip,
-            text="[=]",
-            font=(FONT_FAMILY, 10),
-            bg=self.COLORS["bg"],
-            fg=self.COLORS["muted"],
-        ).pack(side="left", padx=(0, 6))
+        tk.Frame(hint_strip, bg="#23252b", width=48, height=1).pack(side="left", padx=(0, 12), pady=8)
         self.lbl_instruction = tk.Label(
             hint_strip,
             text="TAP BADGE TO CLOCK IN / OUT",
             font=(FONT_FAMILY, FONT_INSTRUCTION),
             bg=self.COLORS["bg"],
-            fg=self.COLORS["muted"],
+            fg=self.COLORS["subtext"],
         )
         self.lbl_instruction.pack(side="left")
-        tk.Frame(hint_strip, bg="#23252b", width=60, height=1).pack(side="left", padx=(12, 0), pady=8)
+        tk.Frame(hint_strip, bg="#23252b", width=48, height=1).pack(side="left", padx=(12, 0), pady=8)
 
         self.overlay_frame = tk.Frame(self.body, bg=self.COLORS["bg"])
         self.overlay_panel = RoundedPanel(
@@ -839,7 +879,7 @@ class KioskApp(tk.Tk):
         bg = self.COLORS["card"] if active else self.COLORS["sidebar"]
         fg = self.COLORS["text"] if active else self.COLORS["subtext"]
         item = tk.Frame(self.sidebar, bg=bg, cursor="hand2")
-        item.pack(fill="x", pady=pady, ipady=12)
+        item.pack(fill="x", pady=pady, ipady=10)
         
         icon_canvas = tk.Canvas(item, width=40, height=40, bg=bg, highlightthickness=0, bd=0)
         icon_canvas.pack(pady=(2, 0))
@@ -941,24 +981,34 @@ class KioskApp(tk.Tk):
         self._update_connection_copy(self.scan_queue.pending_count())
         self.after(2000, self._poll_auth_beacon)
 
+    def _set_status_indicator(self, dot_fg: str, beacon_fg: str, beacon_text: str):
+        self.status_dot.set_color(dot_fg)
+        self.status_beacon.config(text=beacon_text, fg=beacon_fg)
+
     def _update_connection_copy(self, pending_count: int):
         """Show online/offline and queue state in worker-friendly language."""
         t = self.TRANSLATIONS[self.current_lang]
         if self.api_session.is_approved:
             if pending_count:
-                self.status_pill.config(bg=self.COLORS["warning_dim"])
-                self.status_dot.config(bg=self.COLORS["warning_dim"], fg=self.COLORS["warning"])
-                self.status_beacon.config(text=f"Online - syncing {pending_count}", bg=self.COLORS["warning_dim"], fg=self.COLORS["warning"])
+                self._set_status_indicator(
+                    self.COLORS["warning"],
+                    self.COLORS["warning"],
+                    f"Online - syncing {pending_count}",
+                )
                 self.lbl_instruction.config(text=t["clock_instr_syncing"].format(pending_count))
             else:
-                self.status_pill.config(bg=self.COLORS["status_bg"])
-                self.status_dot.config(bg=self.COLORS["status_bg"], fg=self.COLORS["success"])
-                self.status_beacon.config(text="Online", bg=self.COLORS["status_bg"], fg=self.COLORS["success"])
+                self._set_status_indicator(
+                    self.COLORS["success"],
+                    self.COLORS["success"],
+                    "Online",
+                )
                 self.lbl_instruction.config(text=t["clock_instr"])
         else:
-            self.status_pill.config(bg=self.COLORS["error_dim"])
-            self.status_dot.config(bg=self.COLORS["error_dim"], fg=self.COLORS["error"])
-            self.status_beacon.config(text="Offline mode", bg=self.COLORS["error_dim"], fg=self.COLORS["error"])
+            self._set_status_indicator(
+                self.COLORS["error"],
+                self.COLORS["error"],
+                "Offline mode",
+            )
             if pending_count:
                 self.lbl_instruction.config(text=t["clock_instr_offline_saved"].format(pending_count))
             else:
@@ -1611,11 +1661,9 @@ class KioskApp(tk.Tk):
                 if val:
                     lbl.config(text=val)
         # Update status button text
-        if hasattr(self, 'btn_status_wrap'):
-            for w in self.btn_status_wrap.winfo_children():
-                if isinstance(w, RoundedButton):
-                    w.text = t["btn_status"]
-                    w._draw(w.normal_bg)
+        if hasattr(self, "btn_status"):
+            self.btn_status.text = t["btn_status"]
+            self.btn_status._draw(self.btn_status.normal_bg)
 
     def _get_network_info(self):
         """Return list of (label, value, color) tuples describing current network state."""

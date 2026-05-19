@@ -221,12 +221,16 @@ class AuthenticatedSession:
             data = {}
         message = data.get("message") or data.get("error") or response.text or "Server rejected the request."
         error_code = data.get("error_code") or data.get("error") or "request_error"
+        terminal_message = message
+        if response.status_code >= 500:
+            terminal_message = "The server had an internal error. Please ask an admin to check the backend logs."
         return {
             "success": False,
             "http_status": response.status_code,
             "error_code": error_code,
             "message": message,
-            "terminal_message": message,
+            "terminal_message": terminal_message,
+            "debug_message": message,
             "permanent": permanent,
         }
 

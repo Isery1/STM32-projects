@@ -1,116 +1,445 @@
-import tkinter as tk
-from tkinter import font as tkfont
+"""
+manageIO — Time Tracking Kiosk
+Requires: pip install pygame
+ 
+Run: python manageio_kiosk.py
+"""
+ 
+import pygame
+import sys
+import time
+import math
 from datetime import datetime
-
-class ManageIOApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("manageIO RPi")
-        self.root.geometry("800x480")
-        self.root.configure(bg="#0b1326")  # Surface color from Design System
-
-        # Colors from Design System
-        self.colors = {
-            "bg": "#0b1326",
-            "surface_dim": "#0b1326",
-            "surface_bright": "#31394d",
-            "primary": "#7c3aed",
-            "on_primary": "#ffffff",
-            "text": "#ffffff",
-            "text_dim": "#94a3b8",
-            "success": "#10b981"
-        }
-
-        # Custom Fonts (Adjust size for 800x480)
-        self.font_time = tkfont.Font(family="Geist", size=64, weight="bold")
-        self.font_date = tkfont.Font(family="Geist", size=16)
-        self.font_nav = tkfont.Font(family="Geist", size=12)
-        self.font_button = tkfont.Font(family="Geist", size=14, weight="bold")
-
-        self.setup_ui()
-        self.update_clock()
-
-    def setup_ui(self):
-        # Left Navigation Sidebar (80px width)
-        self.sidebar = tk.Frame(self.root, bg="#060e20", width=80)
-        self.sidebar.pack(side="left", fill="y")
-        self.sidebar.pack_propagate(False)
-        
-        # Navigation Items
-        nav_items = [
-            ("Home", "home"),
-            ("User", "person"),
-            ("Admin", "admin_panel_settings"),
-            ("Settings", "settings")
-        ]
-        
-        for text, icon in nav_items:
-            # Container for nav item
-            item_frame = tk.Frame(self.sidebar, bg="#060e20", pady=15)
-            item_frame.pack(fill="x")
-            
-            # Label for text (Simulating icon + text)
-            btn = tk.Label(item_frame, text=text, fg=self.colors["text_dim"], 
-                          bg="#060e20", font=self.font_nav)
-            btn.pack()
-
-        # Main Content Area
-        self.main_content = tk.Frame(self.root, bg=self.colors["bg"])
-        self.main_content.pack(side="right", fill="both", expand=True, padx=40, pady=20)
-
-        # Header with Online Status
-        header = tk.Frame(self.main_content, bg=self.colors["bg"])
-        header.pack(fill="x")
-        
-        tk.Label(header, text="manageIO", fg=self.colors["primary"], bg=self.colors["bg"], 
-                 font=self.font_button).pack(side="left")
-        
-        status_frame = tk.Frame(header, bg="#131b2e", padx=10, pady=2)
-        status_frame.pack(side="right")
-        tk.Canvas(status_frame, width=8, height=8, bg=self.colors["success"], 
-                  highlightthickness=0).pack(side="left", padx=5)
-        tk.Label(status_frame, text="ONLINE", fg=self.colors["success"], bg="#131b2e", 
-                 font=("Geist", 10, "bold")).pack(side="left")
-
-        # Time and Date (Centered in main content)
-        time_container = tk.Frame(self.main_content, bg=self.colors["bg"])
-        time_container.pack(expand=True)
-
-        self.time_label = tk.Label(time_container, text="17:06:57", fg=self.colors["text"], 
-                                  bg=self.colors["bg"], font=self.font_time)
-        self.time_label.pack()
-        
-        self.date_label = tk.Label(time_container, text="SATURDAY, 16. MAY 2026", 
-                                  fg=self.colors["text_dim"], bg=self.colors["bg"], font=self.font_date)
-        self.date_label.pack()
-
-        # Interaction Area (Bottom)
-        interaction_frame = tk.Frame(self.main_content, bg=self.colors["bg"])
-        interaction_frame.pack(fill="x", pady=20)
-
-        # Left: Badge Reader Placeholder
-        self.badge_card = tk.Frame(interaction_frame, bg="#131b2e", highlightbackground="#31394d", 
-                                  highlightthickness=1, width=320, height=140)
-        self.badge_card.pack_propagate(False)
-        self.badge_card.pack(side="left")
-        
-        tk.Label(self.badge_card, text="Tap badge to clock in/out", fg=self.colors["text"], 
-                 bg="#131b2e", font=self.font_button, wraplength=250).pack(expand=True)
-
-        # Right: Primary Action Button
-        status_btn = tk.Button(interaction_frame, text="Check my current status", bg=self.colors["primary"], 
-                               fg=self.colors["on_primary"], font=self.font_button, 
-                               relief="flat", pady=15, padx=30)
-        status_btn.pack(side="right")
-
-    def update_clock(self):
-        now = datetime.now()
-        self.time_label.config(text=now.strftime("%H:%M:%S"))
-        self.date_label.config(text=now.strftime("%A, %d. %B %Y").upper())
-        self.root.after(1000, self.update_clock)
-
+ 
+# ── Config ──────────────────────────────────────────────────────────────────
+ 
+SCREEN_W, SCREEN_H = 800, 480
+FPS = 30
+FULLSCREEN = False          # Set True on the Pi touchscreen
+ 
+# ── Palette ─────────────────────────────────────────────────────────────────
+ 
+BG          = (17,  19,  24)   # main background
+SIDEBAR_BG  = (13,  15,  19)   # slightly darker sidebar
+PANEL_BG    = (255, 255, 255,  10)  # clock panel (drawn with alpha surface)
+BORDER      = (255, 255, 255,  20)
+ 
+WHITE       = (255, 255, 255)
+WHITE_90    = (230, 230, 235)
+WHITE_50    = (160, 160, 168)
+WHITE_30    = (100, 100, 108)
+WHITE_15    = ( 55,  57,  63)
+WHITE_08    = ( 35,  37,  43)
+ 
+PURPLE      = (124,  58, 237)
+PURPLE_HOVER= (109,  40, 217)
+PURPLE_LIGHT= (167, 139, 250)
+PURPLE_DIM  = ( 40,  24,  80)
+ 
+GREEN       = ( 74, 222, 128)
+GREEN_DIM   = ( 20,  60,  35)
+ 
+AMBER       = (251, 191,  36)
+AMBER_DIM   = ( 60,  45,  10)
+ 
+RED         = (248, 113, 113)
+RED_DIM     = ( 70,  20,  20)
+ 
+# ── Clock state (replace with real RFID logic) ───────────────────────────────
+ 
+class AppState:
+    def __init__(self):
+        self.clocked_in   = False
+        self.clock_in_time= None
+        self.show_status  = False
+        self.status_alpha = 0       # fade for status overlay
+        self.last_badge   = None    # last badge scan time (for animation)
+ 
+state = AppState()
+ 
+# ── Helpers ──────────────────────────────────────────────────────────────────
+ 
+def rounded_rect(surface, color, rect, radius, alpha=255):
+    """Draw a filled rounded rect, optionally with transparency."""
+    if alpha < 255:
+        s = pygame.Surface((rect[2], rect[3]), pygame.SRCALPHA)
+        pygame.draw.rect(s, (*color[:3], alpha), (0, 0, rect[2], rect[3]), border_radius=radius)
+        surface.blit(s, (rect[0], rect[1]))
+    else:
+        pygame.draw.rect(surface, color, rect, border_radius=radius)
+ 
+def rounded_rect_border(surface, color, rect, radius, width=1, alpha=255):
+    if alpha < 255:
+        s = pygame.Surface((rect[2], rect[3]), pygame.SRCALPHA)
+        pygame.draw.rect(s, (*color[:3], alpha), (0, 0, rect[2], rect[3]),
+                         border_radius=radius, width=width)
+        surface.blit(s, (rect[0], rect[1]))
+    else:
+        pygame.draw.rect(surface, color, rect, border_radius=radius, width=width)
+ 
+def pill(surface, color, rect, radius=14, alpha=255):
+    rounded_rect(surface, color, rect, radius, alpha)
+ 
+def draw_text(surface, text, font, color, x, y, anchor="topleft"):
+    img = font.render(text, True, color)
+    r   = img.get_rect()
+    setattr(r, anchor, (x, y))
+    surface.blit(img, r)
+    return r
+ 
+# ── Font loader ──────────────────────────────────────────────────────────────
+ 
+def load_fonts():
+    """Load system fonts with sensible fallbacks."""
+    candidates_mono = ["dejavusansmono", "couriernew", "courier", "monospace"]
+    candidates_sans = ["dejavusans", "freesans", "ubuntu", "sans"]
+ 
+    def best(names, size, bold=False):
+        for n in names:
+            try:
+                return pygame.font.SysFont(n, size, bold=bold)
+            except Exception:
+                pass
+        return pygame.font.SysFont(None, size, bold=bold)
+ 
+    return {
+        "clock"  : best(candidates_mono, 76, bold=True),
+        "date"   : best(candidates_sans, 15),
+        "label"  : best(candidates_sans, 12),
+        "nav"    : best(candidates_sans, 10),
+        "btn"    : best(candidates_sans, 14, bold=True),
+        "status" : best(candidates_sans, 13),
+        "title"  : best(candidates_sans, 15, bold=True),
+        "hint"   : best(candidates_sans, 11),
+        "badge"  : best(candidates_sans, 12, bold=True),
+    }
+ 
+# ── Layout constants ─────────────────────────────────────────────────────────
+ 
+SB_W        = 72          # sidebar width
+TOPBAR_H    = 48
+CONTENT_X   = SB_W + 24
+CONTENT_W   = SCREEN_W - SB_W - 48
+CENTER_X    = SB_W + (SCREEN_W - SB_W) // 2
+ 
+NAV_ITEMS = [
+    ("HOME",    "home",    True),
+    ("USER",    "user",    False),
+    ("ADMIN",   "shield",  False),
+]
+ 
+# ── Icon drawing (minimal geometric icons) ───────────────────────────────────
+ 
+def draw_icon_home(surf, cx, cy, size, color):
+    s = size // 2
+    pts = [(cx, cy - s), (cx - s, cy), (cx + s, cy)]
+    pygame.draw.polygon(surf, color, pts, 2)
+    pygame.draw.rect(surf, color, (cx - s//2, cy, s, s), 2)
+ 
+def draw_icon_user(surf, cx, cy, size, color):
+    r = size // 4
+    pygame.draw.circle(surf, color, (cx, cy - r), r, 2)
+    pygame.draw.arc(surf, color,
+                    (cx - size//2, cy - r, size, size//2 + r),
+                    math.pi, 2 * math.pi, 2)
+ 
+def draw_icon_shield(surf, cx, cy, size, color):
+    s = size // 2
+    pts = [(cx, cy - s), (cx + s, cy - s//3),
+           (cx + s, cy + s//4), (cx, cy + s),
+           (cx - s, cy + s//4), (cx - s, cy - s//3)]
+    pygame.draw.polygon(surf, color, pts, 2)
+ 
+def draw_icon_settings(surf, cx, cy, size, color):
+    pygame.draw.circle(surf, color, (cx, cy), size//4, 2)
+    for a in range(0, 360, 60):
+        r = math.radians(a)
+        x1 = cx + int((size//4) * math.cos(r))
+        y1 = cy + int((size//4) * math.sin(r))
+        x2 = cx + int((size//2) * math.cos(r))
+        y2 = cy + int((size//2) * math.sin(r))
+        pygame.draw.line(surf, color, (x1, y1), (x2, y2), 2)
+ 
+def draw_icon_card(surf, cx, cy, size, color):
+    w, h = size, size * 2 // 3
+    pygame.draw.rect(surf, color, (cx - w//2, cy - h//2, w, h), 2, border_radius=3)
+    pygame.draw.line(surf, color, (cx - w//2, cy - h//6), (cx + w//2, cy - h//6), 2)
+ 
+def draw_icon_info(surf, cx, cy, size, color):
+    pygame.draw.circle(surf, color, (cx, cy), size//2, 2)
+    pygame.draw.circle(surf, color, (cx, cy - size//5), 2)
+    pygame.draw.line(surf, color, (cx, cy - size//10), (cx, cy + size//3), 2)
+ 
+def draw_icon_history(surf, cx, cy, size, color):
+    pygame.draw.circle(surf, color, (cx, cy), size//2, 2)
+    pygame.draw.line(surf, color, (cx, cy), (cx, cy - size//3), 2)
+    pygame.draw.line(surf, color, (cx, cy), (cx + size//4, cy), 2)
+    # arrow hint
+    pygame.draw.line(surf, color, (cx - size//2, cy - size//4),
+                     (cx - size//3, cy - size//2), 2)
+    pygame.draw.line(surf, color, (cx - size//2, cy - size//4),
+                     (cx - size//5, cy - size//4), 2)
+ 
+# ── Drawing sections ─────────────────────────────────────────────────────────
+ 
+def draw_sidebar(surf, fonts, mouse_pos, nav_hover):
+    # Background
+    pygame.draw.rect(surf, SIDEBAR_BG, (0, 0, SB_W, SCREEN_H))
+    # Right border
+    s = pygame.Surface((1, SCREEN_H), pygame.SRCALPHA)
+    s.fill((255, 255, 255, 18))
+    surf.blit(s, (SB_W - 1, 0))
+ 
+    # Logo area
+    pygame.draw.rect(surf, SIDEBAR_BG, (0, 0, SB_W, TOPBAR_H))
+    s2 = pygame.Surface((SB_W, 1), pygame.SRCALPHA)
+    s2.fill((255, 255, 255, 18))
+    surf.blit(s2, (0, TOPBAR_H - 1))
+    draw_icon_home(surf, SB_W // 2, TOPBAR_H // 2, 22, PURPLE_LIGHT)
+ 
+    # Nav items
+    icon_fns = [draw_icon_home, draw_icon_user, draw_icon_shield]
+    for i, (label, _, active) in enumerate(NAV_ITEMS):
+        y = TOPBAR_H + 10 + i * 68
+        rect = pygame.Rect(0, y, SB_W, 60)
+ 
+        if active:
+            rounded_rect(surf, PURPLE_DIM, (2, y + 2, SB_W - 4, 56), 8)
+            col = PURPLE_LIGHT
+        elif nav_hover == i:
+            rounded_rect(surf, WHITE_08, (2, y + 2, SB_W - 4, 56), 8)
+            col = WHITE_50
+        else:
+            col = WHITE_30
+ 
+        icon_fns[i](surf, SB_W // 2, y + 22, 20, col)
+        draw_text(surf, label, fonts["nav"], col, SB_W // 2, y + 36, anchor="midtop")
+ 
+    # Settings at bottom
+    sy = SCREEN_H - 60
+    draw_icon_settings(surf, SB_W // 2, sy + 18, 20, WHITE_30)
+    draw_text(surf, "SET", fonts["nav"], WHITE_30, SB_W // 2, sy + 32, anchor="midtop")
+ 
+ 
+def draw_topbar(surf, fonts):
+    pygame.draw.rect(surf, BG, (SB_W, 0, SCREEN_W - SB_W, TOPBAR_H))
+    s = pygame.Surface((SCREEN_W - SB_W, 1), pygame.SRCALPHA)
+    s.fill((255, 255, 255, 18))
+    surf.blit(s, (SB_W, TOPBAR_H - 1))
+ 
+    draw_text(surf, "manageIO", fonts["title"], WHITE_90,
+              SB_W + 20, TOPBAR_H // 2, anchor="midleft")
+ 
+    # Online pill
+    pill_w, pill_h = 72, 24
+    pill_x = SCREEN_W - pill_w - 16
+    pill_y = (TOPBAR_H - pill_h) // 2
+    rounded_rect(surf, GREEN_DIM, (pill_x, pill_y, pill_w, pill_h), 12)
+    rounded_rect_border(surf, GREEN, (pill_x, pill_y, pill_w, pill_h), 12, 1, alpha=80)
+    pygame.draw.circle(surf, GREEN, (pill_x + 14, pill_y + pill_h // 2), 4)
+    draw_text(surf, "Online", fonts["label"], GREEN,
+              pill_x + 24, pill_y + pill_h // 2, anchor="midleft")
+ 
+ 
+def draw_clock_panel(surf, fonts, now):
+    # Panel
+    panel_x = CENTER_X - 220
+    panel_y = TOPBAR_H + 30
+    panel_w, panel_h = 440, 200
+    rounded_rect(surf, (255, 255, 255), (panel_x, panel_y, panel_w, panel_h), 14, alpha=10)
+    rounded_rect_border(surf, (255, 255, 255), (panel_x, panel_y, panel_w, panel_h), 14, 1, alpha=22)
+ 
+    # Time
+    time_str = now.strftime("%H:%M:%S")
+    parts    = time_str.split(":")
+    t_img    = fonts["clock"].render(parts[0], True, WHITE)
+    colon    = fonts["clock"].render(":", True, WHITE_30)
+    t2       = fonts["clock"].render(parts[1], True, WHITE)
+    t3       = fonts["clock"].render(parts[2], True, WHITE)
+ 
+    total_w  = (t_img.get_width() + t2.get_width() + t3.get_width() +
+                colon.get_width() * 2)
+    tx       = CENTER_X - total_w // 2
+    ty       = panel_y + 24
+ 
+    surf.blit(t_img,  (tx, ty))
+    tx += t_img.get_width()
+    surf.blit(colon,  (tx, ty))
+    tx += colon.get_width()
+    surf.blit(t2,     (tx, ty))
+    tx += t2.get_width()
+    surf.blit(colon,  (tx, ty))
+    tx += colon.get_width()
+    surf.blit(t3,     (tx, ty))
+ 
+    # Date
+    date_str = now.strftime("%A, %-d %B %Y").upper()
+    draw_text(surf, date_str, fonts["date"], WHITE_30,
+              CENTER_X, panel_y + 110, anchor="midtop")
+ 
+    # Divider
+    div_y = panel_y + 134
+    s = pygame.Surface((60, 1), pygame.SRCALPHA)
+    s.fill((255, 255, 255, 25))
+    surf.blit(s, (CENTER_X - 30, div_y))
+ 
+    # Status badge inside panel
+    badge_y = div_y + 14
+    draw_text(surf, "Current status", fonts["status"], WHITE_30,
+              CENTER_X - 80, badge_y + 2, anchor="topleft")
+ 
+    if state.clocked_in:
+        b_color, b_dim, b_text = GREEN, GREEN_DIM, "Clocked in"
+    else:
+        b_color, b_dim, b_text = AMBER, AMBER_DIM, "Not clocked in"
+ 
+    bw = fonts["badge"].size(b_text)[0] + 28
+    bh = 22
+    bx = CENTER_X + 82 - bw
+    by = badge_y
+    rounded_rect(surf, b_dim, (bx, by, bw, bh), 11)
+    rounded_rect_border(surf, b_color, (bx, by, bw, bh), 11, 1, alpha=80)
+    pygame.draw.circle(surf, b_color, (bx + 10, by + bh // 2), 4)
+    draw_text(surf, b_text, fonts["badge"], b_color,
+              bx + 20, by + bh // 2, anchor="midleft")
+ 
+    return panel_y + panel_h  # return bottom edge
+ 
+ 
+def draw_buttons(surf, fonts, mouse_pos, panel_bottom):
+    btn_y    = panel_bottom + 16
+    btn_h    = 46
+    gap      = 12
+    btn_w_p  = 270
+    btn_w_s  = 120
+    total_w  = btn_w_p + gap + btn_w_s
+    bx_start = CENTER_X - total_w // 2
+ 
+    # Primary button
+    bx = bx_start
+    hover_p = pygame.Rect(bx, btn_y, btn_w_p, btn_h).collidepoint(mouse_pos)
+    col_p   = PURPLE_HOVER if hover_p else PURPLE
+    rounded_rect(surf, col_p, (bx, btn_y, btn_w_p, btn_h), 10)
+    cx = bx + btn_w_p // 2
+    draw_icon_info(surf, cx - 60, btn_y + btn_h // 2, 18, WHITE)
+    draw_text(surf, "Check my current status", fonts["btn"], WHITE,
+              cx - 44, btn_y + btn_h // 2, anchor="midleft")
+ 
+    # Secondary button
+    bx2    = bx_start + btn_w_p + gap
+    hover_s = pygame.Rect(bx2, btn_y, btn_w_s, btn_h).collidepoint(mouse_pos)
+    col_s   = WHITE_15 if hover_s else WHITE_08
+    rounded_rect(surf, col_s, (bx2, btn_y, btn_w_s, btn_h), 10)
+    rounded_rect_border(surf, (255, 255, 255), (bx2, btn_y, btn_w_s, btn_h), 10, 1, alpha=30)
+    draw_icon_history(surf, bx2 + 22, btn_y + btn_h // 2, 18, WHITE_50)
+    draw_text(surf, "History", fonts["btn"], WHITE_50,
+              bx2 + 40, btn_y + btn_h // 2, anchor="midleft")
+ 
+    return btn_y + btn_h, bx_start, btn_w_p, bx2, btn_w_s
+ 
+ 
+def draw_tap_hint(surf, fonts, btn_bottom):
+    hy = btn_bottom + 22
+    # Decorative lines + icon + text
+    line_w = 60
+    icon_r = 14
+    total  = line_w * 2 + icon_r * 2 + 12 + fonts["hint"].size("TAP BADGE TO CLOCK IN / OUT")[0] + 24
+    lx     = CENTER_X - total // 2
+ 
+    s = pygame.Surface((line_w, 1), pygame.SRCALPHA)
+    s.fill((255, 255, 255, 30))
+    surf.blit(s, (lx, hy + icon_r))
+ 
+    lx2 = lx + line_w + 8
+    pygame.draw.circle(surf, WHITE_15, (lx2 + icon_r, hy + icon_r), icon_r, 1)
+    draw_icon_card(surf, lx2 + icon_r, hy + icon_r, 16, WHITE_30)
+ 
+    lx3 = lx2 + icon_r * 2 + 10
+    draw_text(surf, "TAP BADGE TO CLOCK IN / OUT", fonts["hint"], WHITE_30,
+              lx3, hy + icon_r, anchor="midleft")
+ 
+    lx4 = lx3 + fonts["hint"].size("TAP BADGE TO CLOCK IN / OUT")[0] + 8
+    surf.blit(s, (lx4, hy + icon_r))
+ 
+ 
+# ── Badge scan simulation ─────────────────────────────────────────────────────
+ 
+def simulate_badge_scan():
+    """Toggle clocked-in state. Replace with actual RFID read logic."""
+    state.clocked_in    = not state.clocked_in
+    state.clock_in_time = datetime.now() if state.clocked_in else None
+    state.last_badge    = time.time()
+    print(f"[RFID] {'Clocked IN' if state.clocked_in else 'Clocked OUT'} at {datetime.now():%H:%M:%S}")
+ 
+ 
+# ── Main loop ─────────────────────────────────────────────────────────────────
+ 
+def main():
+    pygame.init()
+    pygame.display.set_caption("manageIO — Time Tracking")
+ 
+    if FULLSCREEN:
+        screen = pygame.display.set_mode((SCREEN_W, SCREEN_H), pygame.FULLSCREEN)
+    else:
+        screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
+ 
+    clock  = pygame.time.Clock()
+    fonts  = load_fonts()
+ 
+    nav_hover = -1
+ 
+    while True:
+        mouse_pos = pygame.mouse.get_pos()
+ 
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
+ 
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit(); sys.exit()
+                if event.key == pygame.K_SPACE:       # simulate badge tap
+                    simulate_badge_scan()
+                if event.key == pygame.K_f:           # toggle fullscreen
+                    FULLSCREEN_NOW = not pygame.display.get_surface().get_flags() & pygame.FULLSCREEN
+                    if FULLSCREEN_NOW:
+                        screen = pygame.display.set_mode((SCREEN_W, SCREEN_H), pygame.FULLSCREEN)
+                    else:
+                        screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
+ 
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # Check primary button click
+                btn_y     = 0   # will be set after draw; use last known
+                # Simulate badge scan on any click for demo
+                simulate_badge_scan()
+ 
+        # ── Detect nav hover
+        nav_hover = -1
+        for i in range(len(NAV_ITEMS)):
+            y = TOPBAR_H + 10 + i * 68
+            if pygame.Rect(0, y, SB_W, 60).collidepoint(mouse_pos):
+                nav_hover = i
+ 
+        # ── Draw
+        screen.fill(BG)
+ 
+        now          = datetime.now()
+        panel_bottom = draw_clock_panel(screen, fonts, now)
+        btn_bottom, *btn_rects = draw_buttons(screen, fonts, mouse_pos, panel_bottom)
+        draw_tap_hint(screen, fonts, btn_bottom)
+        draw_topbar(screen, fonts)
+        draw_sidebar(screen, fonts, mouse_pos, nav_hover)
+ 
+        # Badge scan flash
+        if state.last_badge and (time.time() - state.last_badge) < 0.4:
+            alpha = int(120 * (1 - (time.time() - state.last_badge) / 0.4))
+            fl = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
+            fl.fill((167, 139, 250, alpha))
+            screen.blit(fl, (0, 0))
+ 
+        pygame.display.flip()
+        clock.tick(FPS)
+ 
+ 
 if __name__ == "__main__":
-    root = tk.Tk()
-    # root.attributes('-fullscreen', True) # Uncomment for RPi kiosk mode
-    app = ManageIOApp(root)
-    root.mainloop()
+    main()
