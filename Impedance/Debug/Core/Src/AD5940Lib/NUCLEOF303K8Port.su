@@ -1,0 +1,10 @@
+../Core/Src/AD5940Lib/NUCLEOF303K8Port.c:63:6:AD5940_ReadWriteNBytes	32	static
+../Core/Src/AD5940Lib/NUCLEOF303K8Port.c:71:6:AD5940_CsClr	8	static
+../Core/Src/AD5940Lib/NUCLEOF303K8Port.c:76:6:AD5940_CsSet	8	static
+../Core/Src/AD5940Lib/NUCLEOF303K8Port.c:81:6:AD5940_RstSet	8	static
+../Core/Src/AD5940Lib/NUCLEOF303K8Port.c:86:6:AD5940_RstClr	8	static
+../Core/Src/AD5940Lib/NUCLEOF303K8Port.c:95:6:AD5940_Delay10us	24	static
+../Core/Src/AD5940Lib/NUCLEOF303K8Port.c:103:10:AD5940_GetMCUIntFlag	4	static
+../Core/Src/AD5940Lib/NUCLEOF303K8Port.c:108:10:AD5940_ClrMCUIntFlag	4	static
+../Core/Src/AD5940Lib/NUCLEOF303K8Port.c:119:10:AD5940_MCUResourceInit	16	static
+../Core/Src/AD5940Lib/NUCLEOF303K8Port.c:131:6:AD5940_SetMCUIntFlag	4	static

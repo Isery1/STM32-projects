@@ -1,0 +1,4 @@
+../Core/Src/AD5940Lib/AD5940Main.c:24:9:ImpedanceShowResult	48	static
+../Core/Src/AD5940Lib/AD5940Main.c:40:16:AD5940PlatformCfg	72	static
+../Core/Src/AD5940Lib/AD5940Main.c:86:6:AD5940ImpedanceStructInit	16	static
+../Core/Src/AD5940Lib/AD5940Main.c:122:6:AD5940_Main	16	static

@@ -1,0 +1,9 @@
+../Core/Src/AD5940Lib/Impedance.c:88:9:AppIMPGetCfg	16	static
+../Core/Src/AD5940Lib/Impedance.c:98:9:AppIMPCtrl	104	static
+../Core/Src/AD5940Lib/Impedance.c:168:7:AppIMPGetCurrFreq	4	static
+../Core/Src/AD5940Lib/Impedance.c:177:18:AppIMPSeqCfgGen	256	static
+../Core/Src/AD5940Lib/Impedance.c:321:18:AppIMPSeqMeasureGen	72	static
+../Core/Src/AD5940Lib/Impedance.c:397:9:AppIMPInit	56	static
+../Core/Src/AD5940Lib/Impedance.c:468:9:AppIMPRegModify	16	static
+../Core/Src/AD5940Lib/Impedance.c:492:9:AppIMPDataProcess	72	static
+../Core/Src/AD5940Lib/Impedance.c:550:9:AppIMPISR	24	static
